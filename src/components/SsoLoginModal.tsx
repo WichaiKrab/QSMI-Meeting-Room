@@ -48,8 +48,6 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
   const [activeMode, setActiveMode] = useState<'login' | 'register' | 'register_success'>('login');
 
   // --- LOGIN STATES ---
-  const [roleFilter, setRoleFilter] = useState<'all' | UserRole>('all');
-  const [selectedUser, setSelectedUser] = useState<UserAccount | null>(null);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('1234');
   const [error, setError] = useState('');
@@ -78,28 +76,6 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
       setRegDept(availableDepts[0]);
     }
   }, [availableDepts, regDept]);
-
-  // Quick select user in Login
-  const handleSelectPredefined = (u: UserAccount, autoSubmit: boolean = false) => {
-    setSelectedUser(u);
-    setUsername(u.username);
-    const pwd = u.password || (u.role === 'admin' ? 'admin123' : '1234');
-    setPassword(pwd);
-    setError('');
-
-    if (autoSubmit) {
-      if (u.status === 'pending') {
-        setError('⚠️ บัญชีนี้อยู่ระหว่างรอผู้ดูแลระบบ (Admin) อนุมัติการใช้งาน ยังไม่สามารถเข้าสู่ระบบได้');
-        return;
-      }
-      if (u.status === 'rejected') {
-        setError(`❌ บัญชีไม่ได้รับการอนุมัติ: ${u.rejectionReason || 'โปรดติดต่อผู้ดูแลระบบ'}`);
-        return;
-      }
-      onLoginSuccess(u);
-      onClose();
-    }
-  };
 
   const handleLoginFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,11 +161,6 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
     setRegisteredApplicant(newUser);
     setActiveMode('register_success');
   };
-
-  const filteredUsers = users.filter((u) => {
-    if (roleFilter === 'all') return true;
-    return u.role === roleFilter;
-  });
 
   return (
     <div
@@ -292,120 +263,6 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
               </div>
             )}
 
-            {/* Role Filter Tabs */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
-                  เลือกบัญชีผู้ใช้ทดสอบด่วน (Quick Test Accounts):
-                </span>
-              </div>
-              <div className="grid grid-cols-4 gap-1 p-1 bg-gray-100 rounded-xl text-xs font-bold mb-2">
-                <button
-                  type="button"
-                  onClick={() => setRoleFilter('all')}
-                  className={`py-1.5 rounded-lg transition ${
-                    roleFilter === 'all' ? 'bg-white text-gray-900 shadow-2xs' : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  ทั้งหมด
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRoleFilter('admin')}
-                  className={`py-1.5 rounded-lg transition flex items-center justify-center gap-1 ${
-                    roleFilter === 'admin' ? 'bg-purple-600 text-white shadow-2xs' : 'text-purple-700 hover:bg-purple-50'
-                  }`}
-                >
-                  Super Admin
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRoleFilter('manager')}
-                  className={`py-1.5 rounded-lg transition flex items-center justify-center gap-1 ${
-                    roleFilter === 'manager' ? 'bg-blue-600 text-white shadow-2xs' : 'text-blue-700 hover:bg-blue-50'
-                  }`}
-                >
-                  Admin
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRoleFilter('employee')}
-                  className={`py-1.5 rounded-lg transition flex items-center justify-center gap-1 ${
-                    roleFilter === 'employee' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-emerald-700 hover:bg-emerald-50'
-                  }`}
-                >
-                  User
-                </button>
-              </div>
-
-              {/* Quick Employee Selector Scrollbox */}
-              <div className="max-h-36 overflow-y-auto custom-scrollbar border border-gray-200 rounded-2xl p-1.5 space-y-1 bg-gray-50/50">
-                {filteredUsers.map((u) => {
-                  const isSelected = selectedUser?.username === u.username;
-                  const isPending = u.status === 'pending';
-                  const isRejected = u.status === 'rejected';
-
-                  return (
-                    <button
-                      key={u.username}
-                      type="button"
-                      onClick={() => handleSelectPredefined(u)}
-                      className={`w-full p-2 rounded-xl text-left transition flex items-center justify-between text-xs ${
-                        isSelected
-                          ? 'bg-red-50 border border-[#C8102E]/40 text-[#C8102E] font-bold shadow-2xs'
-                          : 'hover:bg-white text-gray-700 font-medium'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span
-                          className={`w-2 h-2 rounded-full shrink-0 ${
-                            isPending
-                              ? 'bg-amber-500 animate-pulse'
-                              : isRejected
-                              ? 'bg-red-500'
-                              : u.role === 'admin'
-                              ? 'bg-purple-600'
-                              : u.role === 'manager'
-                              ? 'bg-blue-600'
-                              : 'bg-emerald-500'
-                          }`}
-                        />
-                        <div className="min-w-0">
-                          <div className="truncate font-bold text-gray-900">{u.name}</div>
-                          <div className="text-[11px] text-gray-500 truncate">{u.department}</div>
-                        </div>
-                      </div>
-
-                      <div className="shrink-0 text-right ml-2">
-                        {isPending ? (
-                          <span className="inline-block px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300">
-                            รอ Super Admin อนุมัติ
-                          </span>
-                        ) : isRejected ? (
-                          <span className="inline-block px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-red-100 text-red-800">
-                            ไม่อนุมัติ
-                          </span>
-                        ) : (
-                          <span
-                            className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              u.role === 'admin'
-                                ? 'bg-purple-100 text-purple-800'
-                                : u.role === 'manager'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-emerald-100 text-emerald-800'
-                            }`}
-                          >
-                            {u.role === 'admin' ? 'Super Admin' : u.role === 'manager' ? 'Admin' : 'User'}
-                          </span>
-                        )}
-                        <div className="text-[10px] text-gray-400 font-mono mt-0.5">{u.username}</div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
             {/* Login Inputs */}
             <form onSubmit={handleLoginFormSubmit} className="space-y-3 pt-1">
               <div>
@@ -417,7 +274,7 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="กรอก username หรือคลิกเลือกจากรายการด้านบน"
+                  placeholder="กรอกชื่อผู้ใช้งาน (Username)"
                   className="w-full p-2.5 border border-gray-300 rounded-xl text-xs sm:text-sm font-medium text-gray-800 outline-none focus:ring-2 focus:ring-[#C8102E]"
                 />
               </div>
@@ -432,7 +289,7 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="รหัสผ่าน (ค่าเริ่มต้น 1234 หรือ admin123)"
+                    placeholder="กรอกรหัสผ่าน"
                     className="w-full p-2.5 border border-gray-300 rounded-xl text-xs sm:text-sm font-medium text-gray-800 outline-none focus:ring-2 focus:ring-[#C8102E]"
                   />
                   <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400">

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Plus } from 'lucide-react';
 import { CalendarView } from '../types';
 import {
@@ -23,6 +23,8 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   onChangeViewMode,
   onQuickBook
 }) => {
+  const dateInputRef = useRef<HTMLInputElement>(null);
+
   const handlePrev = () => {
     const next = new Date(currentDate);
     if (viewMode === 'day') {
@@ -56,6 +58,22 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
       const [y, m, d] = e.target.value.split('-').map(Number);
       const chosen = new Date(y, m - 1, d);
       onChangeDate(chosen);
+    }
+  };
+
+  const handleTriggerPicker = () => {
+    if (dateInputRef.current) {
+      try {
+        if (typeof dateInputRef.current.showPicker === 'function') {
+          dateInputRef.current.showPicker();
+        } else {
+          dateInputRef.current.focus();
+          dateInputRef.current.click();
+        }
+      } catch {
+        dateInputRef.current.focus();
+        dateInputRef.current.click();
+      }
     }
   };
 
@@ -120,23 +138,31 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
       </div>
 
       {/* Center: Current Date Header & Clickable Calendar */}
-      <div className="relative group cursor-pointer flex flex-col items-center select-none text-center">
+      <button
+        type="button"
+        onClick={handleTriggerPicker}
+        className="relative group cursor-pointer flex flex-col items-center select-none text-center px-3 py-1 rounded-xl hover:bg-gray-50 transition border border-transparent hover:border-gray-200"
+        title="คลิกเพื่อเลือกวันที่จากปฏิทิน"
+      >
         <h2 className="text-base sm:text-lg md:text-xl font-bold flex items-center justify-center space-x-2 text-gray-900 group-hover:text-[#C8102E] transition">
           <CalendarIcon size={20} className="text-[#C8102E] shrink-0" />
           <span>{getTitle()}</span>
         </h2>
-        {/* Invisible full-click HTML date input overlay */}
+        {/* Hidden HTML date input */}
         <input
+          ref={dateInputRef}
           type="date"
           value={isoDate}
           onChange={handleNativeDateInput}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20 full-click-calendar"
-          title="คลิกเพื่อเลือกวันที่จากปฏิทิน"
+          onClick={(e) => e.stopPropagation()}
+          className="sr-only pointer-events-none"
+          tabIndex={-1}
+          aria-hidden="true"
         />
         <span className="text-[10px] text-gray-400 opacity-0 group-hover:opacity-100 transition whitespace-nowrap pointer-events-none mt-0.5">
           คลิกเพื่อเลือกวันที่
         </span>
-      </div>
+      </button>
 
       {/* Right: View Mode Selector & Quick Booking Button */}
       <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
