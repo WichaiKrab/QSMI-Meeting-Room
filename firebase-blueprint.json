@@ -1,0 +1,107 @@
+{
+  "entities": {
+    "rooms": {
+      "fields": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "color": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "capacity": { "type": "number" },
+        "location": { "type": "string" },
+        "hasSpecialSeating": { "type": "boolean" },
+        "description": { "type": "string" },
+        "equipment": { "type": "array" },
+        "seatingOptions": { "type": "array" }
+      }
+    },
+    "bookings": {
+      "fields": {
+        "id": { "type": "string" },
+        "roomId": { "type": "string" },
+        "topic": { "type": "string" },
+        "department": { "type": "string" },
+        "requesterName": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "username": { "type": "string" },
+        "institute": { "type": "string" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "participants": { "type": "number" },
+        "snacks": { "type": "number" },
+        "lunch": { "type": "number" },
+        "drinks": { "type": "number" },
+        "equipment": { "type": "array" },
+        "meetingType": { "type": "string" },
+        "onlineLinkType": { "type": "string" },
+        "meetingLink": { "type": "string" },
+        "seatingSetup": { "type": "string" },
+        "note": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "status": { "type": "string" },
+        "isBlocked": { "type": "boolean" },
+        "rejectionReason": { "type": "string" },
+        "cancelledAt": { "type": "string" },
+        "cancellationReason": { "type": "string" }
+      }
+    },
+    "users": {
+      "fields": {
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "name": { "type": "string" },
+        "department": { "type": "string" },
+        "role": { "type": "string" },
+        "avatarColor": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "title": { "type": "string" },
+        "status": { "type": "string" },
+        "registeredAt": { "type": "string" }
+      }
+    },
+    "departments": {
+      "fields": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "headName": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "building": { "type": "string" },
+        "description": { "type": "string" },
+        "color": { "type": "string" }
+      }
+    },
+    "mail": {
+      "fields": {
+        "to": { "type": "array" },
+        "message": { "type": "object" },
+        "bookingId": { "type": "string" },
+        "type": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "emailNotifications": {
+      "fields": {
+        "id": { "type": "string" },
+        "bookingId": { "type": "string" },
+        "recipient": { "type": "string" },
+        "subject": { "type": "string" },
+        "bodyText": { "type": "string" },
+        "htmlBody": { "type": "string" },
+        "type": { "type": "string" },
+        "sentAt": { "type": "string" },
+        "isRead": { "type": "boolean" },
+        "isAdminNotice": { "type": "boolean" }
+      }
+    },
+    "systemSettings": {
+      "fields": {
+        "smtpConfig": { "type": "object" },
+        "adminEmails": { "type": "array" },
+        "updatedAt": { "type": "string" }
+      }
+    }
+  }
+}

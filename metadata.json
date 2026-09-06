@@ -1,0 +1,6 @@
+{
+  "name": "ระบบจองห้องประชุมออนไลน์",
+  "description": "ระบบจองห้องประชุมออนไลน์พร้อมสถานะห้องว่างแบบเรียลไทม์ ปฏิทินรายวัน/สัปดาห์/เดือน ซิงค์ Google Calendar ระบบ SSO และแดชบอร์ดสถิติผู้บริหาร",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
