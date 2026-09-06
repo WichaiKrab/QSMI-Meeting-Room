@@ -57,7 +57,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
     .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
   return (
-    <div className="space-y-3 sm:space-y-4 flex-1 min-h-0 flex flex-col overflow-y-auto custom-scrollbar pr-1 sm:pr-1.5">
+    <div className="space-y-3 sm:space-y-4 flex-1 min-h-0 flex flex-col overflow-y-auto custom-scrollbar pr-1 sm:pr-2 pb-6">
       {/* Filter Bar */}
       <div className="bg-white p-2.5 sm:p-4 rounded-2xl shadow-sm border border-gray-200 flex items-center justify-between gap-2 sm:gap-3">
         <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
@@ -84,7 +84,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
       </div>
 
       {/* Month Calendar Matrix */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden shrink-0">
         {/* Days of Week Header */}
         <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-100/80 text-center text-xs font-bold text-gray-600 py-2.5">
           {WEEK_DAY_NAMES.map((name, i) => (
@@ -95,7 +95,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
         </div>
 
         {/* Days Cells Grid */}
-        <div className="grid grid-cols-7 border-collapse">
+        <div className="grid grid-cols-7 border-collapse bg-white">
           {monthDays.map((dayItem, idx) => {
             const { date: cellDate, isCurrentMonth } = dayItem;
             const isToday = isSameDay(cellDate, new Date());
@@ -118,15 +118,15 @@ export const MonthView: React.FC<MonthViewProps> = ({
             const hasBlocked = dayBookings.some((b) => b.isBlocked);
             const hasApproved = dayBookings.some((b) => (!b.status || b.status === 'approved') && !b.isBlocked);
 
-            const maxVisible = 3;
+            const maxVisible = 2;
             const visibleBookings = dayBookings.slice(0, maxVisible);
             const overflow = dayBookings.length - maxVisible;
 
             return (
               <div
-                key={idx}
+                key={`${cellDate.toISOString()}-${idx}`}
                 onClick={() => setSelectedCellDate(cellDate)}
-                className={`min-h-[90px] sm:min-h-[125px] lg:min-h-[145px] p-1.5 sm:p-2 border-b border-r border-gray-200 flex flex-col transition group relative ${
+                className={`min-h-[75px] sm:min-h-[90px] md:min-h-[100px] lg:min-h-[110px] xl:min-h-[118px] p-1 sm:p-2 border-b border-r border-gray-200 flex flex-col transition group relative ${
                   !isCurrentMonth ? 'bg-gray-50/50 text-gray-400' : 'bg-white hover:bg-red-50/20 cursor-pointer'
                 } ${isSelected ? 'ring-2 ring-inset ring-[#C8102E]/40 bg-red-50/30' : ''}`}
               >
