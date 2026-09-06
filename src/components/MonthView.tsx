@@ -57,7 +57,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
     .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
   return (
-    <div className="space-y-3 sm:space-y-4 flex-1 min-h-0 flex flex-col overflow-y-auto no-scrollbar">
+    <div className="space-y-3 sm:space-y-4 flex-1 min-h-0 flex flex-col overflow-y-auto custom-scrollbar pr-1 sm:pr-1.5">
       {/* Filter Bar */}
       <div className="bg-white p-2.5 sm:p-4 rounded-2xl shadow-sm border border-gray-200 flex items-center justify-between gap-2 sm:gap-3">
         <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
@@ -79,7 +79,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
           </select>
         </div>
         <div className="text-xs font-medium text-gray-500 hidden sm:block whitespace-nowrap shrink-0">
-          คลิกวันที่เพื่อดูรายละเอียดรายการจองทั้งหมด
+          คลิกวันที่หรือรายการจองเพื่อดูรายละเอียด
         </div>
       </div>
 
@@ -118,7 +118,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
             const hasBlocked = dayBookings.some((b) => b.isBlocked);
             const hasApproved = dayBookings.some((b) => (!b.status || b.status === 'approved') && !b.isBlocked);
 
-            const maxVisible = 2;
+            const maxVisible = 3;
             const visibleBookings = dayBookings.slice(0, maxVisible);
             const overflow = dayBookings.length - maxVisible;
 
@@ -126,7 +126,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
               <div
                 key={idx}
                 onClick={() => setSelectedCellDate(cellDate)}
-                className={`min-h-[75px] sm:min-h-[110px] p-1 sm:p-2 border-b border-r border-gray-200 flex flex-col transition group relative ${
+                className={`min-h-[90px] sm:min-h-[125px] lg:min-h-[145px] p-1.5 sm:p-2 border-b border-r border-gray-200 flex flex-col transition group relative ${
                   !isCurrentMonth ? 'bg-gray-50/50 text-gray-400' : 'bg-white hover:bg-red-50/20 cursor-pointer'
                 } ${isSelected ? 'ring-2 ring-inset ring-[#C8102E]/40 bg-red-50/30' : ''}`}
               >
@@ -191,10 +191,13 @@ export const MonthView: React.FC<MonthViewProps> = ({
                           if (isAdminMode && onEditBooking) onEditBooking(b);
                           else onViewBooking(b);
                         }}
-                        className={`text-[11px] p-1 px-1.5 rounded-lg border truncate cursor-pointer transition font-semibold flex items-center gap-1 ${pillClass}`}
+                        className={`text-[11px] p-1 px-1.5 rounded-lg border truncate cursor-pointer transition font-medium flex items-center gap-1 leading-tight ${pillClass}`}
                         title={`${timeText} ${room ? `[${room.name}]` : ''} ${b.topic}`}
                       >
                         <span className="font-bold shrink-0">{timeText}</span>
+                        {room && selectedRoomId === 'all' && (
+                          <span className="opacity-90 shrink-0 font-normal">[{room.name}]</span>
+                        )}
                         <span className="truncate">{b.topic}</span>
                       </div>
                     );
