@@ -49,8 +49,16 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
 
   // --- LOGIN STATES ---
   const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('1234');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+
+  // Reset inputs when modal opens or closes
+  useEffect(() => {
+    if (isOpen) {
+      setPassword('');
+      setError('');
+    }
+  }, [isOpen]);
 
   // --- REGISTER STATES ---
   const [regUsername, setRegUsername] = useState('');
@@ -110,7 +118,7 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
       onLoginSuccess(targetUser);
       onClose();
     } else {
-      setError('รหัสผ่านไม่ถูกต้อง (รหัสผ่านทดสอบเริ่มต้น: 1234)');
+      setError('รหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบและลองใหม่อีกครั้ง');
     }
   };
 

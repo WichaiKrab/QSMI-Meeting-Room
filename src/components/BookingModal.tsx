@@ -57,7 +57,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const [drinks, setDrinks] = useState<number | ''>('');
   const [equipment, setEquipment] = useState<string[]>([]);
   const [seatingSetup, setSeatingSetup] = useState<string>('');
-  const [customSeatingInput, setCustomSeatingInput] = useState<string>('');
   const [meetingType, setMeetingType] = useState<'Onsite' | 'Online'>('Onsite');
   const [note, setNote] = useState('');
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
@@ -89,6 +88,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
+
+  const now = new Date();
+  const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
   const [startDateStr, setStartDateStr] = useState('');
   const [endDateStr, setEndDateStr] = useState('');
@@ -123,7 +125,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         ? roomSeatingOptions[0]
         : '';
       setSeatingSetup(initialSeat);
-      setCustomSeatingInput('');
       setMeetingType(bookingData.meetingType || 'Onsite');
       setNote(bookingData.note || '');
 
@@ -170,7 +171,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       setEquipment([]);
       const defaultSeat = hasRoomSeating ? roomSeatingOptions[0] : '';
       setSeatingSetup(defaultSeat);
-      setCustomSeatingInput('');
       setMeetingType('Onsite');
       setNote('');
 
@@ -194,14 +194,6 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     );
   };
 
-  const handleAddCustomSeating = () => {
-    const trimmed = customSeatingInput.trim();
-    if (trimmed) {
-      setSeatingSetup(trimmed);
-      setCustomSeatingInput('');
-    }
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setWarningMessage(null);
@@ -210,6 +202,16 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       setWarningMessage('กรุณาระบุวันเริ่มต้นและวันที่สิ้นสุดการจอง');
       return;
     }
+
+    const startD = new Date(startDateStr);
+    startD.setHours(0, 0, 0, 0);
+    const todayD = new Date();
+    todayD.setHours(0, 0, 0, 0);
+    if (startD < todayD && !bookingData) {
+      setWarningMessage('ไม่สามารถจองห้องประชุมย้อนหลังได้ กรุณาเลือกวันที่ปัจจุบันหรือล่วงหน้า');
+      return;
+    }
+
     if (new Date(endDateStr) < new Date(startDateStr)) {
       setWarningMessage('วันที่สิ้นสุดต้องไม่เกิดขึ้นก่อนวันที่เริ่มต้น');
       return;
@@ -347,6 +349,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                 <input
                   type="date"
                   required
+                  min={bookingData ? undefined : todayIso}
                   value={startDateStr}
                   onChange={(e) => {
                     const newStart = e.target.value;
@@ -674,35 +677,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                       <span className="leading-snug">{seatingSetup}</span>
                     </div>
                     <span className="text-[10px] text-amber-700 font-medium bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 shrink-0 ml-2">
-                      ระบุเพิ่มเติม
+                      ระบุเดิม
                     </span>
                   </label>
                 )}
-              </div>
-
-              {/* Custom Seating Input */}
-              <div className="mt-2.5 flex items-center gap-2">
-                <input
-                  type="text"
-                  value={customSeatingInput}
-                  onChange={(e) => setCustomSeatingInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddCustomSeating();
-                    }
-                  }}
-                  placeholder="ระบุรูปแบบการจัดโต๊ะอื่นๆ เพิ่มเติม (ถ้าต้องการ)..."
-                  className="flex-1 p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 outline-none focus:ring-2 focus:ring-[#C8102E]"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddCustomSeating}
-                  className="px-3 py-2 bg-gray-800 hover:bg-black text-white text-xs font-bold rounded-xl transition shrink-0 flex items-center gap-1"
-                >
-                  <Plus size={14} />
-                  <span>เลือกรูปแบบนี้</span>
-                </button>
               </div>
             </div>
           )}

@@ -42,6 +42,8 @@ interface NotificationCenterModalProps {
   bookings: Booking[];
   users: UserAccount[];
   emailNotifications: EmailNotification[];
+  readNotificationIds?: string[];
+  onMarkNotificationsRead?: (ids: string[]) => void;
   onOpenBooking: (bookingId: string) => void;
   onClearEmailNotifications: () => void;
   onOpenManagement?: () => void;
@@ -55,6 +57,8 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
   bookings,
   users,
   emailNotifications,
+  readNotificationIds = [],
+  onMarkNotificationsRead,
   onOpenBooking,
   onClearEmailNotifications,
   onOpenManagement,
@@ -63,10 +67,16 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
   const [activeTab, setActiveTab] = useState<'bookings' | 'system'>('bookings');
   const [filterType, setFilterType] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
+  const [localReadIds, setLocalReadIds] = useState<Set<string>>(() => new Set());
   const [selectedEmail, setSelectedEmail] = useState<EmailNotification | null>(
     emailNotifications.length > 0 ? emailNotifications[0] : null
   );
+
+  const readIdsSet = useMemo(() => {
+    const combined = new Set(readNotificationIds);
+    localReadIds.forEach((id) => combined.add(id));
+    return combined;
+  }, [readNotificationIds, localReadIds]);
 
   // Build unified notifications list
   const notifications: AppNotification[] = useMemo(() => {
@@ -84,7 +94,7 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
           timestamp: u.registeredAt || new Date().toISOString(),
           department: u.department,
           requesterName: u.name,
-          isRead: readIds.has(`user_pending_${u.username}`),
+          isRead: readIdsSet.has(`user_pending_${u.username}`),
           severity: 'warning'
         });
       });
@@ -112,7 +122,7 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
           bookingId: b.id,
           department: b.department,
           requesterName: b.requesterName,
-          isRead: readIds.has(`booking_pending_${b.id}`),
+          isRead: readIdsSet.has(`booking_pending_${b.id}`),
           severity: 'warning'
         });
       } else if (b.status === 'approved') {
@@ -125,7 +135,7 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
           bookingId: b.id,
           department: b.department,
           requesterName: b.requesterName,
-          isRead: readIds.has(`booking_approved_${b.id}`),
+          isRead: readIdsSet.has(`booking_approved_${b.id}`),
           severity: 'success'
         });
       } else if (b.status === 'rejected') {
@@ -138,7 +148,7 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
           bookingId: b.id,
           department: b.department,
           requesterName: b.requesterName,
-          isRead: readIds.has(`booking_rejected_${b.id}`),
+          isRead: readIdsSet.has(`booking_rejected_${b.id}`),
           severity: 'error'
         });
       } else if (b.status === 'cancelled') {
@@ -151,7 +161,7 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
           bookingId: b.id,
           department: b.department,
           requesterName: b.requesterName,
-          isRead: readIds.has(`booking_cancelled_${b.id}`),
+          isRead: readIdsSet.has(`booking_cancelled_${b.id}`),
           severity: 'info'
         });
       }
@@ -159,7 +169,18 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
 
     // Sort newest first
     return list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  }, [bookings, users, emailNotifications, currentUser, readIds]);
+  }, [bookings, users, emailNotifications, currentUser, readIdsSet]);
+
+  // Auto mark all visible notifications as read on opening
+  useEffect(() => {
+    if (isOpen && notifications.length > 0) {
+      const allIds = notifications.map((n) => n.id);
+      setLocalReadIds((prev) => new Set([...prev, ...allIds]));
+      if (onMarkNotificationsRead) {
+        onMarkNotificationsRead(allIds);
+      }
+    }
+  }, [isOpen, notifications.length, onMarkNotificationsRead]);
 
   // Filtered notifications
   const filteredNotifications = useMemo(() => {
@@ -202,12 +223,18 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
   }, [unreadCount, onUnreadCountChange]);
 
   const handleMarkAllAsRead = () => {
-    const allIds = new Set(notifications.map((n) => n.id));
-    setReadIds(allIds);
+    const allIds = notifications.map((n) => n.id);
+    setLocalReadIds((prev) => new Set([...prev, ...allIds]));
+    if (onMarkNotificationsRead) {
+      onMarkNotificationsRead(allIds);
+    }
   };
 
   const handleItemClick = (n: AppNotification) => {
-    setReadIds((prev) => new Set([...prev, n.id]));
+    setLocalReadIds((prev) => new Set([...prev, n.id]));
+    if (onMarkNotificationsRead) {
+      onMarkNotificationsRead([n.id]);
+    }
     if (n.bookingId) {
       onOpenBooking(n.bookingId);
       onClose();

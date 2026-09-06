@@ -16,7 +16,7 @@ interface MonthViewProps {
   isAdminMode: boolean;
   onSlotClick: (room: Room, time: string, customDate: Date) => void;
   onViewBooking: (booking: Booking) => void;
-  onSelectDay: (date: Date) => void;
+  onSelectDay?: (date: Date) => void;
   onEditBooking?: (booking: Booking) => void;
   onDeleteBooking?: (id: string) => void;
 }
@@ -38,6 +38,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
   const monthDays = getMonthDays(currentDate);
   const isAllRooms = selectedRoomId === 'all';
   const targetRoom = isAllRooms ? null : rooms.find((r) => r.id === selectedRoomId);
+  const bookableRoom = targetRoom || rooms.find((r) => r.isActive) || rooms[0];
 
   // Filter bookings for the selected cell date
   const cellStart = new Date(selectedCellDate);
@@ -58,15 +59,16 @@ export const MonthView: React.FC<MonthViewProps> = ({
   return (
     <div className="space-y-3 sm:space-y-4 flex-1 min-h-0 flex flex-col overflow-y-auto no-scrollbar">
       {/* Filter Bar */}
-      <div className="bg-white p-3 sm:p-4 rounded-2xl shadow-sm border border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <span className="text-xs font-bold uppercase text-gray-500 whitespace-nowrap">
+      <div className="bg-white p-2.5 sm:p-4 rounded-2xl shadow-sm border border-gray-200 flex items-center justify-between gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
+          <label htmlFor="month-room-select" className="text-xs font-bold text-gray-700 whitespace-nowrap shrink-0">
             เลือกห้องประชุม:
-          </span>
+          </label>
           <select
+            id="month-room-select"
             value={selectedRoomId}
             onChange={(e) => setSelectedRoomId(e.target.value)}
-            className="w-full sm:w-auto p-2 px-3 border border-gray-300 rounded-xl text-xs sm:text-sm font-bold bg-white text-gray-800 outline-none focus:ring-2 focus:ring-[#C8102E]"
+            className="flex-1 sm:w-auto p-2 px-2.5 sm:px-3 border border-gray-300 rounded-xl text-xs sm:text-sm font-bold bg-white text-gray-800 outline-none focus:ring-2 focus:ring-[#C8102E] min-w-0 truncate"
           >
             <option value="all">ทุกห้องประชุม (แสดงภาพรวมทั้งเดือน)</option>
             {rooms.map((r) => (
@@ -76,7 +78,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
             ))}
           </select>
         </div>
-        <div className="text-xs font-medium text-gray-500 hidden sm:block">
+        <div className="text-xs font-medium text-gray-500 hidden sm:block whitespace-nowrap shrink-0">
           คลิกวันที่เพื่อดูรายละเอียดรายการจองทั้งหมด
         </div>
       </div>
@@ -211,38 +213,43 @@ export const MonthView: React.FC<MonthViewProps> = ({
       </div>
 
       {/* Selected Day Bookings Detail Panel */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-5 space-y-3">
-        <div className="flex items-center justify-between border-b border-gray-100 pb-3 gap-2">
-          <div>
-            <h3 className="font-bold text-sm sm:text-base text-gray-900 flex items-center gap-2">
-              <CalendarIcon size={18} className="text-[#C8102E]" />
-              <span>{formatThaiDate(selectedCellDate, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-3.5 sm:p-5 space-y-3">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-2.5 sm:pb-3 gap-2">
+          <div className="min-w-0 flex-1">
+            <h3 className="font-bold text-xs sm:text-base text-gray-900 flex items-center gap-1.5 truncate whitespace-nowrap">
+              <CalendarIcon size={16} className="text-[#C8102E] shrink-0" />
+              <span className="truncate">
+                {formatThaiDate(selectedCellDate, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+              </span>
             </h3>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5 truncate whitespace-nowrap">
               {selectedDayBookings.length > 0
                 ? `พบรายการจองทั้งหมด ${selectedDayBookings.length} รายการ`
                 : 'ไม่มีรายการจองห้องประชุมในวันนี้ (ห้องว่าง)'}
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onSelectDay(selectedCellDate)}
-              className="text-xs sm:text-sm flex items-center gap-1 text-gray-700 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-xl font-bold border border-gray-200 shadow-2xs transition"
-            >
-              <span>เปิดมุมมองวัน</span>
-              <ChevronRight size={14} />
-            </button>
-
-            {targetRoom && targetRoom.isActive && (
+          <div className="shrink-0 flex items-center">
+            {isAllRooms ? (
               <button
                 type="button"
-                onClick={() => onSlotClick(targetRoom, '09:00', selectedCellDate)}
-                className="text-xs sm:text-sm flex items-center gap-1 text-white px-3.5 py-1.5 rounded-xl font-bold bg-[#C8102E] hover:bg-[#a00c24] shadow-xs transition"
+                onClick={() => onSelectDay?.(selectedCellDate)}
+                className="text-xs sm:text-sm flex items-center gap-1 text-gray-700 bg-gray-100 hover:bg-gray-200 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl font-bold border border-gray-200 shadow-2xs transition whitespace-nowrap shrink-0"
               >
-                <Plus size={14} /> จองวันนี้
+                <span>เปิดมุมมองวัน</span>
+                <ChevronRight size={14} className="shrink-0" />
               </button>
+            ) : (
+              targetRoom && targetRoom.isActive && (
+                <button
+                  type="button"
+                  onClick={() => onSlotClick(targetRoom, '09:00', selectedCellDate)}
+                  className="text-xs sm:text-sm flex items-center gap-1 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl font-bold bg-[#C8102E] hover:bg-[#a00c24] shadow-xs transition whitespace-nowrap shrink-0"
+                >
+                  <Plus size={14} className="shrink-0" />
+                  <span>จองวันนี้</span>
+                </button>
+              )
             )}
           </div>
         </div>
@@ -259,7 +266,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
               const isMultiDay = bStart.getDate() !== bEnd.getDate();
 
               const timeText = isMultiDay
-                ? 'ตลอดวัน (ต่อเนื่อง)'
+                ? 'ตลอดวัน'
                 : `${formatThaiTime(bStart, { hour: '2-digit', minute: '2-digit' })} - ${formatThaiTime(bEnd, { hour: '2-digit', minute: '2-digit' })}`;
 
               if (isBlocked) {
@@ -271,11 +278,11 @@ export const MonthView: React.FC<MonthViewProps> = ({
                     }}
                     className="text-xs bg-red-50 p-3 rounded-xl border border-red-200 text-red-700 font-bold flex items-center justify-between gap-2"
                   >
-                    <div className="flex items-center gap-1.5 truncate">
+                    <div className="flex items-center gap-1.5 truncate min-w-0">
                       <Ban size={15} className="text-red-500 shrink-0" />
                       <span className="truncate">{b.topic}</span>
                     </div>
-                    <span className="text-[10px] bg-red-200 text-red-800 px-2 py-0.5 rounded shrink-0">
+                    <span className="text-[10px] bg-red-200 text-red-800 px-2 py-0.5 rounded shrink-0 whitespace-nowrap">
                       ปิดปรับปรุง
                     </span>
                   </div>
@@ -293,14 +300,14 @@ export const MonthView: React.FC<MonthViewProps> = ({
                     isPending ? 'bg-amber-50/70 border-amber-200' : 'bg-blue-50/40 border-blue-200'
                   }`}
                 >
-                  <div className="space-y-1">
+                  <div className="space-y-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-bold text-xs sm:text-sm text-gray-800 truncate flex items-center gap-1">
+                      <span className="font-bold text-xs sm:text-sm text-gray-800 truncate flex items-center gap-1 min-w-0">
                         {isPending && <Clock size={12} className="text-amber-600 shrink-0" />}
-                        {b.topic}
+                        <span className="truncate">{b.topic}</span>
                       </span>
                       <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap ${
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap shrink-0 ${
                           isPending ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'
                         }`}
                       >
@@ -312,9 +319,9 @@ export const MonthView: React.FC<MonthViewProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1.5 border-t border-black/5">
-                    <span className="truncate">{b.requesterName} ({b.department || '-'})</span>
-                    <span className="font-bold text-gray-700 shrink-0 bg-white px-2 py-0.5 rounded border border-gray-200">
+                  <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1.5 border-t border-black/5 gap-2">
+                    <span className="truncate min-w-0">{b.requesterName} ({b.department || '-'})</span>
+                    <span className="font-bold text-gray-700 shrink-0 bg-white px-2 py-0.5 rounded border border-gray-200 whitespace-nowrap">
                       {timeText}
                     </span>
                   </div>

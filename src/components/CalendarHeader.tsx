@@ -53,10 +53,24 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
     onChangeDate(new Date());
   };
 
+  const now = new Date();
+  const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
   const handleNativeDateInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.value) {
       const [y, m, d] = e.target.value.split('-').map(Number);
       const chosen = new Date(y, m - 1, d);
+      
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const startOfChosen = new Date(y, m - 1, d);
+      startOfChosen.setHours(0, 0, 0, 0);
+
+      if (startOfChosen < startOfToday) {
+        onChangeDate(new Date());
+        return;
+      }
+
       onChangeDate(chosen);
     }
   };
@@ -153,6 +167,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
           ref={dateInputRef}
           type="date"
           value={isoDate}
+          min={todayIso}
           onChange={handleNativeDateInput}
           onClick={(e) => e.stopPropagation()}
           className="sr-only pointer-events-none"

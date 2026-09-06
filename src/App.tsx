@@ -192,7 +192,6 @@ export default function App() {
   const [editingRoomForModal, setEditingRoomForModal] = useState<Room | null>(null);
 
   // Modal open states
-  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isMyBookingsOpen, setIsMyBookingsOpen] = useState(false);
@@ -401,31 +400,108 @@ export default function App() {
     ).length;
   }, [bookings, currentUser]);
 
+  // Persistent read notifications tracking per username
+  const [readNotificationIds, setReadNotificationIds] = useState<string[]>(() => {
+    try {
+      const savedUser = localStorage.getItem('meeting_app_sso_user');
+      if (savedUser) {
+        const u = JSON.parse(savedUser);
+        if (u?.username) {
+          const saved = localStorage.getItem(`meeting_app_read_notifs_${u.username.toLowerCase()}`);
+          return saved ? JSON.parse(saved) : [];
+        }
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Sync readNotificationIds on currentUser change
+  useEffect(() => {
+    if (currentUser?.username) {
+      try {
+        const saved = localStorage.getItem(`meeting_app_read_notifs_${currentUser.username.toLowerCase()}`);
+        setReadNotificationIds(saved ? JSON.parse(saved) : []);
+      } catch {
+        setReadNotificationIds([]);
+      }
+    } else {
+      setReadNotificationIds([]);
+    }
+  }, [currentUser?.username]);
+
+  const handleMarkNotificationsRead = (idsToMark: string[]) => {
+    if (!currentUser?.username || idsToMark.length === 0) return;
+    setReadNotificationIds((prev) => {
+      const combined = Array.from(new Set([...prev, ...idsToMark]));
+      try {
+        localStorage.setItem(`meeting_app_read_notifs_${currentUser.username.toLowerCase()}`, JSON.stringify(combined));
+      } catch (e) {
+        console.error('Error saving read notifications', e);
+      }
+      return combined;
+    });
+  };
+
   // Pending user registrations count (for Admin badge)
   const pendingUsers = useMemo(() => {
     return users.filter((u) => u.status === 'pending');
   }, [users]);
 
-  // Total notification count for header badge
+  // Total notification count for header badge (counting only unread notifications)
   const totalNotificationsCount = useMemo(() => {
+    if (!currentUser) return 0;
+    const readSet = new Set(readNotificationIds);
     let count = 0;
-    if (currentUser?.role === 'admin' || currentUser?.role === 'manager') {
-      count += pendingDeptCount;
-      if (currentUser?.role === 'admin') count += pendingUsers.length;
+
+    // 1. Pending member registrations (for Admin & Manager)
+    if (currentUser.role === 'admin' || currentUser.role === 'manager') {
+      const pendingUsersList = users.filter((u) => u.status === 'pending');
+      pendingUsersList.forEach((u) => {
+        if (!readSet.has(`user_pending_${u.username}`)) {
+          count++;
+        }
+      });
     }
-    // Check pending bookings for user
-    if (currentUser && currentUser.role === 'employee') {
-      count += bookings.filter(
-        (b) =>
-          (b.username === currentUser.username || b.requesterName === currentUser.name) &&
-          (b.status === 'approved' || b.status === 'rejected')
-      ).length;
-    }
+
+    // 2. Booking notifications
+    bookings.forEach((b) => {
+      const isMine =
+        b.username?.toLowerCase() === currentUser.username.toLowerCase() ||
+        (b.requesterName && b.requesterName.trim().toLowerCase() === currentUser.name.trim().toLowerCase()) ||
+        (currentUser.email && b.email && b.email.toLowerCase() === currentUser.email.toLowerCase());
+      const isAdmin = currentUser.role === 'admin' || currentUser.role === 'manager';
+
+      if (!isAdmin && !isMine) return;
+
+      if (b.status === 'pending') {
+        if (!readSet.has(`booking_pending_${b.id}`)) count++;
+      } else if (b.status === 'approved') {
+        if (!readSet.has(`booking_approved_${b.id}`)) count++;
+      } else if (b.status === 'rejected') {
+        if (!readSet.has(`booking_rejected_${b.id}`)) count++;
+      } else if (b.status === 'cancelled') {
+        if (!readSet.has(`booking_cancelled_${b.id}`)) count++;
+      }
+    });
+
     return count;
-  }, [currentUser, pendingDeptCount, pendingUsers, bookings]);
+  }, [currentUser, users, bookings, readNotificationIds]);
 
   // --- Handlers ---
   const handleOpenSlot = (room: Room, time: string, customDate?: Date) => {
+    const targetDate = customDate || currentDate;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const checkDate = new Date(targetDate);
+    checkDate.setHours(0, 0, 0, 0);
+
+    if (checkDate < today) {
+      showToast('ไม่สามารถจองห้องประชุมในวันที่ย้อนหลังได้ กรุณาเลือกวันที่ปัจจุบันหรือในอนาคต', 'error');
+      return;
+    }
+
     if (customDate) setCurrentDate(customDate);
     setSelectedSlotRoom(room);
     setSelectedSlotTime(time);
@@ -443,6 +519,15 @@ export default function App() {
   };
 
   const handleQuickBook = () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const checkDate = new Date(currentDate);
+    checkDate.setHours(0, 0, 0, 0);
+    const targetDate = checkDate < today ? new Date() : currentDate;
+    if (checkDate < today) {
+      setCurrentDate(targetDate);
+    }
+
     const defaultRoom = rooms[0];
     const defaultTime = '09:00';
     setSelectedSlotRoom(defaultRoom);
@@ -451,7 +536,7 @@ export default function App() {
 
     // If not logged in: display login modal first
     if (!currentUser) {
-      setPendingBookingSlot({ room: defaultRoom, time: defaultTime, date: currentDate });
+      setPendingBookingSlot({ room: defaultRoom, time: defaultTime, date: targetDate });
       setLoginModalReason('กรุณาเข้าสู่ระบบก่อนทำการจองห้องประชุม');
       setIsSsoModalOpen(true);
       return;
@@ -1031,7 +1116,7 @@ export default function App() {
         myBookingsCount={myBookingsCount}
         pendingDeptCount={pendingDeptCount}
         pendingUsersCount={pendingUsers.length}
-        totalNotificationsCount={unreadNotificationsCount}
+        totalNotificationsCount={totalNotificationsCount}
         onOpenMyBookings={() => setIsMyBookingsOpen(true)}
         onOpenGuide={() => setIsGuideModalOpen(true)}
         onOpenEmailInbox={() => {
@@ -1348,7 +1433,8 @@ export default function App() {
         bookings={bookings}
         users={users}
         emailNotifications={emailNotifications}
-        onUnreadCountChange={setUnreadNotificationsCount}
+        readNotificationIds={readNotificationIds}
+        onMarkNotificationsRead={handleMarkNotificationsRead}
         onOpenBooking={(bId) => {
           const found = bookings.find((b) => b.id === bId);
           if (found) {
