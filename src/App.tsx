@@ -1370,6 +1370,7 @@ export default function App() {
         }}
         onResendEmail={handleResendEmail}
         onDeleteClick={(b) => handleDeleteBooking(b.id)}
+        onOpenAdminLogin={() => setIsAdminLoginModalOpen(true)}
       />
 
       {/* 3. SSO Employee Authentication Modal */}
@@ -1465,13 +1466,13 @@ export default function App() {
           showToast('ล้างกล่องข้อความอีเมลเรียบร้อย', 'info');
         }}
         onOpenBookingFromEmail={(bId) => {
-          const found = bookings.find((b) => b.id === bId);
+          const found = bookings.find((b) => b.id === bId || String(b.id) === String(bId));
           if (found) {
             setIsEmailModalOpen(false);
             setViewingBooking(found);
             setIsDetailModalOpen(true);
           } else {
-            showToast('ไม่พบรายการจองนี้ในระบบ', 'error');
+            showToast(`ไม่พบรายการจองรหัส ${bId} ในระบบ`, 'error');
           }
         }}
       />

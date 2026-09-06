@@ -25,6 +25,7 @@ export const buildEmailHtml = (data: {
   extraMessage?: string;
   isAdminNotice: boolean;
   approvalLink?: string;
+  bookingId?: string;
 }): string => {
   const {
     statusBadgeText,
@@ -47,7 +48,8 @@ export const buildEmailHtml = (data: {
     note,
     extraMessage,
     isAdminNotice,
-    approvalLink
+    approvalLink,
+    bookingId
   } = data;
 
   return `
@@ -173,10 +175,10 @@ export const buildEmailHtml = (data: {
           }
 
           ${
-            approvalLink
+            isAdminNotice && approvalLink
               ? `
-            <div style="margin-top: 20px; text-align: center;">
-              <a href="${approvalLink}" style="display: inline-block; padding: 14px 32px; background-color: #C8102E; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 700; border-radius: 8px; letter-spacing: 0.5px; box-shadow: 0 2px 8px rgba(200,16,46,0.3);">
+            <div style="margin-top: 24px; margin-bottom: 8px; text-align: center;">
+              <a href="${approvalLink}" data-booking-id="${bookingId || ''}" class="booking-approval-btn" style="display: inline-block; padding: 14px 32px; background-color: #C8102E; color: #ffffff !important; text-decoration: none; font-size: 15px; font-weight: 700; border-radius: 10px; letter-spacing: 0.5px; box-shadow: 0 4px 12px rgba(200,16,46,0.25); cursor: pointer; text-align: center;">
                 📋 คลิกเพื่อดูรายละเอียดและอนุมัติการจอง
               </a>
               <div style="margin-top: 10px; font-size: 12px; color: #6b7280;">
@@ -374,7 +376,9 @@ export const createEmailNotifications = (
   }
 
   // 2. Email for Admin (OWNER_EMAILS)
-  const approvalLink = `#bookingId=${booking.id}`;
+  // Approval button is ONLY generated for Admin notifications when the status is pending / type is RECEIVED
+  const isPendingStatus = type === 'RECEIVED' || booking.status === 'pending';
+  const approvalLink = isPendingStatus ? `#bookingId=${booking.id}` : undefined;
   const adminSubject = `[แจ้งเตือน Super Admin/Admin] ${subject}`;
   const adminHtml = buildEmailHtml({
     statusBadgeText,
@@ -397,7 +401,8 @@ export const createEmailNotifications = (
     note: booking.note,
     extraMessage: reason,
     isAdminNotice: true,
-    approvalLink
+    approvalLink,
+    bookingId: booking.id
   });
 
   OWNER_EMAILS.forEach((ownerEmail) => {

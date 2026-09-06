@@ -18,12 +18,21 @@ export const EmailNotificationModal: React.FC<EmailNotificationModalProps> = ({
   onClearAll,
   onOpenBookingFromEmail
 }) => {
-  if (!isOpen) return null;
-
   const [selectedMail, setSelectedMail] = useState<EmailNotification | null>(
     notifications.length > 0 ? notifications[0] : null
   );
   const [viewHtmlMode, setViewHtmlMode] = useState<boolean>(true);
+
+  // Sync selected mail when modal opens or notifications change
+  React.useEffect(() => {
+    if (isOpen && notifications.length > 0) {
+      if (!selectedMail || !notifications.some((n) => n.id === selectedMail.id)) {
+        setSelectedMail(notifications[0]);
+      }
+    }
+  }, [isOpen, notifications, selectedMail]);
+
+  if (!isOpen) return null;
 
   return (
     <div
@@ -200,15 +209,38 @@ export const EmailNotificationModal: React.FC<EmailNotificationModalProps> = ({
                     <div
                       className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden max-w-xl mx-auto"
                       onClick={(e) => {
-                        const anchor = (e.target as HTMLElement).closest('a');
-                        if (anchor) {
-                          const href = anchor.getAttribute('href');
-                          if (href && href.includes('bookingId=')) {
-                            e.preventDefault();
-                            const bId = href.split('bookingId=')[1]?.replace(/[^a-zA-Z0-9_-]/g, '');
-                            if (bId) {
-                              onOpenBookingFromEmail(bId);
+                        const target = e.target as HTMLElement;
+                        const anchor = target.closest('a') || (target.tagName === 'A' ? (target as HTMLAnchorElement) : null);
+                        const btnEl = target.closest('.booking-approval-btn') || target.closest('a');
+                        
+                        // Check if click was on approval button or link
+                        if (
+                          anchor ||
+                          btnEl ||
+                          target.textContent?.includes('คลิกเพื่อดูรายละเอียดและอนุมัติการจอง') ||
+                          target.textContent?.includes('อนุมัติการจอง')
+                        ) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          
+                          let bId =
+                            anchor?.getAttribute('data-booking-id') ||
+                            btnEl?.getAttribute('data-booking-id');
+
+                          if (!bId && anchor) {
+                            const href = anchor.getAttribute('href') || '';
+                            if (href.includes('bookingId=')) {
+                              bId = href.split('bookingId=')[1]?.split('&')[0]?.replace(/[^a-zA-Z0-9_-]/g, '');
                             }
+                          }
+
+                          // Fallback to currently viewed email's bookingId
+                          if (!bId && selectedMail?.bookingId) {
+                            bId = selectedMail.bookingId;
+                          }
+
+                          if (bId) {
+                            onOpenBookingFromEmail(bId);
                           }
                         }
                       }}

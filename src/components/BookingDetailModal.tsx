@@ -34,6 +34,7 @@ interface BookingDetailModalProps {
   onCancelClick?: (booking: Booking) => void;
   onResendEmail?: (booking: Booking) => void;
   onDeleteClick?: (booking: Booking) => void;
+  onOpenAdminLogin?: () => void;
 }
 
 export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
@@ -47,7 +48,8 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
   onReject,
   onCancelClick,
   onResendEmail,
-  onDeleteClick
+  onDeleteClick,
+  onOpenAdminLogin
 }) => {
   if (!isOpen || !booking) return null;
 
@@ -352,6 +354,26 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
 
         {/* Action Footer */}
         <div className="p-4 border-t border-gray-100 bg-gray-50/90 space-y-2 shrink-0">
+          {/* Prompt to login as Admin/Manager to approve if viewing a pending booking */}
+          {isPending && !isBlocked && !canApproveOrReject && onOpenAdminLogin && (
+            <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-900 flex items-center justify-between gap-3">
+              <div>
+                <span className="font-bold block">คำขอนี้รอการอนุมัติ</span>
+                <span className="text-[11px] text-amber-700">เข้าสู่ระบบผู้ดูแลระบบเพื่อทำการอนุมัติหรือปฏิเสธคำขอนี้</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenAdminLogin();
+                }}
+                className="px-3 py-1.5 bg-[#C8102E] hover:bg-[#a00c24] text-white font-bold rounded-xl text-xs shadow-2xs transition shrink-0"
+              >
+                เข้าสู่ระบบ Admin
+              </button>
+            </div>
+          )}
+
           {/* Approve & Reject Buttons (Admin or Dept Manager) */}
           {canApproveOrReject && (
             <div className="flex gap-2">
