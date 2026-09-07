@@ -69,11 +69,9 @@ export async function initializeFirestoreDefaults() {
 export function subscribeToRooms(callback: (rooms: Room[]) => void) {
   const q = collection(db, ROOMS_COL);
   return onSnapshot(q, (snapshot) => {
-    if (!snapshot.empty) {
-      const items: Room[] = [];
-      snapshot.forEach((docSnap) => items.push(docSnap.data() as Room));
-      callback(items);
-    }
+    const items: Room[] = [];
+    snapshot.forEach((docSnap) => items.push(docSnap.data() as Room));
+    callback(items);
   }, (err) => {
     console.warn('Rooms subscription error:', err);
   });
@@ -82,11 +80,9 @@ export function subscribeToRooms(callback: (rooms: Room[]) => void) {
 export function subscribeToBookings(callback: (bookings: Booking[]) => void) {
   const q = collection(db, BOOKINGS_COL);
   return onSnapshot(q, (snapshot) => {
-    if (!snapshot.empty) {
-      const items: Booking[] = [];
-      snapshot.forEach((docSnap) => items.push(docSnap.data() as Booking));
-      callback(items);
-    }
+    const items: Booking[] = [];
+    snapshot.forEach((docSnap) => items.push(docSnap.data() as Booking));
+    callback(items);
   }, (err) => {
     console.warn('Bookings subscription error:', err);
   });
@@ -95,11 +91,9 @@ export function subscribeToBookings(callback: (bookings: Booking[]) => void) {
 export function subscribeToUsers(callback: (users: UserAccount[]) => void) {
   const q = collection(db, USERS_COL);
   return onSnapshot(q, (snapshot) => {
-    if (!snapshot.empty) {
-      const items: UserAccount[] = [];
-      snapshot.forEach((docSnap) => items.push(docSnap.data() as UserAccount));
-      callback(items);
-    }
+    const items: UserAccount[] = [];
+    snapshot.forEach((docSnap) => items.push(docSnap.data() as UserAccount));
+    callback(items);
   }, (err) => {
     console.warn('Users subscription error:', err);
   });
@@ -108,11 +102,9 @@ export function subscribeToUsers(callback: (users: UserAccount[]) => void) {
 export function subscribeToDepartments(callback: (depts: Department[]) => void) {
   const q = collection(db, DEPTS_COL);
   return onSnapshot(q, (snapshot) => {
-    if (!snapshot.empty) {
-      const items: Department[] = [];
-      snapshot.forEach((docSnap) => items.push(docSnap.data() as Department));
-      callback(items);
-    }
+    const items: Department[] = [];
+    snapshot.forEach((docSnap) => items.push(docSnap.data() as Department));
+    callback(items);
   }, (err) => {
     console.warn('Departments subscription error:', err);
   });

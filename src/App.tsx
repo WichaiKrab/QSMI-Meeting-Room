@@ -92,8 +92,11 @@ export default function App() {
   const [bookings, setBookings] = useState<Booking[]>(() => {
     try {
       const saved = localStorage.getItem('meeting_app_bookings');
-      const rawBookings: Booking[] = saved ? JSON.parse(saved) : INITIAL_BOOKINGS;
+      let rawBookings: Booking[] = saved ? JSON.parse(saved) : INITIAL_BOOKINGS;
       if (Array.isArray(rawBookings) && rawBookings.length > 0) {
+        // Automatically purge legacy mock items (e.g. MR-00001 to MR-00007 from old mock data)
+        const mockIds = new Set(['MR-00001', 'MR-00002', 'MR-00003', 'MR-00004', 'MR-00005', 'MR-00006', 'MR-00007']);
+        rawBookings = rawBookings.filter((b: Booking) => !mockIds.has(b.id));
         return rawBookings.map((b: Booking) => ({
           ...b,
           seatingSetup: b.seatingSetup ? normalizeSeatingName(b.seatingSetup) : b.seatingSetup,
@@ -139,7 +142,14 @@ export default function App() {
   const [users, setUsers] = useState<UserAccount[]>(() => {
     try {
       const saved = localStorage.getItem('meeting_app_users');
-      return saved ? JSON.parse(saved) : CORPORATE_USERS;
+      let rawUsers: UserAccount[] = saved ? JSON.parse(saved) : CORPORATE_USERS;
+      if (Array.isArray(rawUsers) && rawUsers.length > 0) {
+        const legacyMockUsers = new Set(['admin1', 'mgr1', 'mgr2', 'mgr3', 'user1', 'user2', 'user3', 'user4', 'user5', 'user6', 'user7', 'napa.reg', 'panu.reg']);
+        rawUsers = rawUsers.filter((u: UserAccount) => !legacyMockUsers.has(u.username));
+        if (rawUsers.length === 0) return CORPORATE_USERS;
+        return rawUsers;
+      }
+      return CORPORATE_USERS;
     } catch {
       return CORPORATE_USERS;
     }
@@ -257,14 +267,18 @@ export default function App() {
     });
 
     const unsubBookings = subscribeToBookings((cloudBookings) => {
-      if (cloudBookings) {
-        setBookings(cloudBookings);
-      }
+      setBookings(cloudBookings || []);
+      try {
+        localStorage.setItem('meeting_app_bookings', JSON.stringify(cloudBookings || []));
+      } catch (_) {}
     });
 
     const unsubUsers = subscribeToUsers((cloudUsers) => {
       if (cloudUsers && cloudUsers.length > 0) {
         setUsers(cloudUsers);
+        try {
+          localStorage.setItem('meeting_app_users', JSON.stringify(cloudUsers));
+        } catch (_) {}
       }
     });
 
