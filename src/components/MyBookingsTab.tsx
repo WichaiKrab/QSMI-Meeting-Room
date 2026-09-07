@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -17,6 +17,8 @@ import {
   Building,
   UserCheck,
   ShieldCheck,
+  ChevronDown,
+  ChevronUp,
   X
 } from 'lucide-react';
 import { Booking, Room, UserAccount } from '../types';
@@ -108,6 +110,19 @@ export const MyBookingsTab: React.FC<MyBookingsTabProps> = ({
         }
       });
   }, [userBookings, rooms, statusFilter, searchTerm, sortBy]);
+
+  // Display limit for pagination / load more (Default: 10 items)
+  const [visibleCount, setVisibleCount] = useState<number>(10);
+
+  // Reset to 10 items whenever filters, search, or sorting change
+  useEffect(() => {
+    setVisibleCount(10);
+  }, [statusFilter, searchTerm, sortBy]);
+
+  // Slice bookings according to visibleCount
+  const displayedBookings = useMemo(() => {
+    return filteredAndSortedBookings.slice(0, visibleCount);
+  }, [filteredAndSortedBookings, visibleCount]);
 
   // Render role badge
   const renderRoleBadge = () => {
@@ -397,7 +412,7 @@ export const MyBookingsTab: React.FC<MyBookingsTabProps> = ({
             )}
           </div>
         ) : (
-          filteredAndSortedBookings.map((b) => {
+          displayedBookings.map((b) => {
             const room = rooms.find((r) => r.id === b.roomId);
             const roomName = room ? room.name : 'ห้องเดิม (ถูกลบ)';
 
@@ -618,6 +633,68 @@ export const MyBookingsTab: React.FC<MyBookingsTabProps> = ({
           })
         )}
       </div>
+
+      {/* Load More Section / ดูเพิ่มเติม */}
+      {filteredAndSortedBookings.length > 0 && (
+        <div className="pt-2 pb-6 flex flex-col items-center justify-center gap-3">
+          {/* Item Counter Info */}
+          <div className="text-xs text-gray-500 font-medium flex items-center gap-1.5">
+            <span>กำลังแสดง</span>
+            <span className="font-bold text-gray-900 bg-gray-100 px-2 py-0.5 rounded-md">
+              {displayedBookings.length}
+            </span>
+            <span>จากทั้งหมด</span>
+            <span className="font-bold text-gray-900 bg-gray-100 px-2 py-0.5 rounded-md">
+              {filteredAndSortedBookings.length}
+            </span>
+            <span>รายการ</span>
+            {filteredAndSortedBookings.length > displayedBookings.length && (
+              <span className="text-gray-400 font-normal ml-0.5">
+                (คงเหลืออีก {filteredAndSortedBookings.length - displayedBookings.length} รายการ)
+              </span>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          {filteredAndSortedBookings.length > visibleCount ? (
+            <div className="flex items-center gap-2.5 flex-wrap justify-center">
+              {/* Load More +10 */}
+              <button
+                type="button"
+                onClick={() => setVisibleCount((prev) => prev + 10)}
+                className="px-6 py-2.5 bg-white hover:bg-gray-50 active:scale-98 text-gray-800 font-bold border border-gray-300 hover:border-gray-400 rounded-xl text-xs sm:text-sm shadow-2xs hover:shadow-xs transition flex items-center gap-2 cursor-pointer"
+              >
+                <ChevronDown size={16} className="text-[#C8102E]" />
+                <span>ดูเพิ่มเติม (+10 รายการ)</span>
+              </button>
+
+              {/* Show All if more than 10 left */}
+              {filteredAndSortedBookings.length - visibleCount > 10 && (
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount(filteredAndSortedBookings.length)}
+                  className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 active:scale-98 text-gray-700 font-semibold rounded-xl text-xs sm:text-sm transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>แสดงทั้งหมด ({filteredAndSortedBookings.length})</span>
+                </button>
+              )}
+            </div>
+          ) : (
+            filteredAndSortedBookings.length > 10 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setVisibleCount(10);
+                }}
+                className="px-4 py-2 text-xs font-semibold text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <ChevronUp size={14} />
+                <span>ย่อกลับ (แสดง 10 รายการแรก)</span>
+              </button>
+            )
+          )}
+        </div>
+      )}
     </div>
   );
 };
