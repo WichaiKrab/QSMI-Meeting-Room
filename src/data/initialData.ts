@@ -272,6 +272,7 @@ export const CORPORATE_USERS: UserAccount[] = [
   // 1. Super Admin (ผู้ดูแลระบบสูงสุด)
   {
     username: 'admin',
+    password: 'admin123',
     name: 'นายวิชัย ศรีต่างคำ',
     department: 'ฝ่ายบริหารงานทั่วไป',
     role: 'admin',

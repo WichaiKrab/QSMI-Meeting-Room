@@ -13,6 +13,10 @@ export interface Room {
 
 export type BookingStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
 
+// User Roles:
+// 'admin' = ผู้ดูแลระบบสูงสุด (Super Admin)
+// 'manager' = ผู้ดูแลระบบ (Admin)
+// 'employee' = ผู้ใช้งานทั่วไป (User)
 export type UserRole = 'admin' | 'manager' | 'employee';
 
 export type UserStatus = 'pending' | 'approved' | 'rejected';

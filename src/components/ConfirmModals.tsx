@@ -1,26 +1,83 @@
-import React, { useState } from 'react';
-import { X, Lock, AlertCircle, Ban, AlertTriangle, Send, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Lock, AlertCircle, Ban, AlertTriangle, Send, Check, User, Eye, EyeOff } from 'lucide-react';
 import { Booking, Room, UserAccount } from '../types';
+import { CORPORATE_USERS } from '../data/initialData';
 
 /* 1. ADMIN LOGIN MODAL */
 interface AdminLoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (adminUser?: UserAccount) => void;
+  users?: UserAccount[];
 }
 
-export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  if (!isOpen) return null;
+export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  users = []
+}) => {
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setUsername('');
+      setPassword('');
+      setShowPassword(false);
+      setError('');
+    }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.trim() === 'admin123') {
-      onSuccess();
+    setError('');
+
+    const trimmedUsername = username.trim();
+    if (!trimmedUsername) {
+      setError('กรุณากรอกชื่อผู้ใช้งาน (Username)');
+      return;
+    }
+    if (!password) {
+      setError('กรุณากรอกรหัสผ่าน (Password)');
+      return;
+    }
+
+    const allUsers = users && users.length > 0 ? users : CORPORATE_USERS;
+    const targetUser = allUsers.find(
+      (u) => u.username.toLowerCase() === trimmedUsername.toLowerCase()
+    );
+
+    if (!targetUser) {
+      setError('ไม่พบชื่อผู้ใช้งานนี้ในระบบ กรุณาตรวจสอบอีกครั้ง');
+      return;
+    }
+
+    if (targetUser.role !== 'admin') {
+      setError('บัญชีนี้ไม่มีสิทธิ์การเข้าใช้งานในฐานะผู้ดูแลระบบ (Admin)');
+      return;
+    }
+
+    if (targetUser.status === 'pending') {
+      setError('บัญชีผู้ใช้นี้อยู่ระหว่างรออนุมัติการใช้งาน');
+      return;
+    }
+
+    if (targetUser.status === 'rejected') {
+      setError(`บัญชีผู้ใช้นี้ไม่ได้รับการอนุมัติ: ${targetUser.rejectionReason || 'โปรดติดต่อผู้ดูแลระบบ'}`);
+      return;
+    }
+
+    const validPwd = targetUser.password || 'admin123';
+    if (password === validPwd || (targetUser.role === 'admin' && password === 'admin123')) {
+      onSuccess(targetUser);
       onClose();
     } else {
-      setError('รหัสผ่านผู้ดูแลระบบไม่ถูกต้อง (รหัสผ่านคือ admin123)');
+      setError('รหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบและลองใหม่อีกครั้ง');
     }
   };
 
@@ -54,34 +111,64 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({ isOpen, onClos
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit} className="space-y-3.5">
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1">
-              รหัสผ่านผู้ดูแลระบบ (Admin Password)
+              ชื่อผู้ใช้งาน (Username)
             </label>
-            <input
-              type="password"
-              autoFocus
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="กรอกรหัสผ่าน Admin..."
-              className="w-full p-2.5 border border-gray-300 rounded-xl text-xs sm:text-sm font-medium outline-none focus:ring-2 focus:ring-gray-900"
-            />
-            <span className="text-[10px] text-gray-400 mt-1 block">รหัสผ่านเริ่มต้น: admin123</span>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                <User size={16} />
+              </div>
+              <input
+                type="text"
+                autoFocus
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="กรอกชื่อผู้ใช้งาน Admin..."
+                className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-xl text-xs sm:text-sm font-medium outline-none focus:ring-2 focus:ring-gray-900"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-700 mb-1">
+              รหัสผ่าน (Password)
+            </label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                <Lock size={16} />
+              </div>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="กรอกรหัสผ่าน Admin..."
+                className="w-full pl-9 pr-10 py-2.5 border border-gray-300 rounded-xl text-xs sm:text-sm font-medium outline-none focus:ring-2 focus:ring-gray-900"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </div>
 
           <div className="pt-2 flex gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs transition"
+              className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs sm:text-sm transition"
             >
               ยกเลิก
             </button>
             <button
               type="submit"
-              className="flex-1 py-2 bg-gray-900 hover:bg-black text-white font-bold rounded-xl text-xs shadow-xs transition"
+              className="flex-1 py-2.5 bg-gray-900 hover:bg-black text-white font-bold rounded-xl text-xs sm:text-sm shadow-xs transition"
             >
               ยืนยัน
             </button>

@@ -68,7 +68,7 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
   onOpenManagement,
   onUnreadCountChange
 }) => {
-  const [activeTab, setActiveTab] = useState<'bookings' | 'system'>('bookings');
+  const [activeTab, setActiveTab] = useState<'all' | 'bookings' | 'system'>('all');
   const [filterType, setFilterType] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [localReadIds, setLocalReadIds] = useState<Set<string>>(() => new Set());
@@ -116,7 +116,7 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
     bookings.forEach((b) => {
       const isMine = currentUser && (
         b.username?.toLowerCase() === currentUser.username.toLowerCase() ||
-        b.requesterName.trim().toLowerCase() === currentUser.name.trim().toLowerCase() ||
+        (b.requesterName && b.requesterName.trim().toLowerCase() === currentUser.name.trim().toLowerCase()) ||
         (currentUser.email && b.email && b.email.toLowerCase() === currentUser.email.toLowerCase())
       );
       const isAdmin = currentUser && (currentUser.role === "admin" || currentUser.role === "manager");
@@ -138,36 +138,40 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
           severity: 'warning'
         });
       } else if (b.status === 'approved') {
-        list.push({
-          id: `booking_approved_${b.id}`,
-          type: 'booking_approved',
-          title: isMine ? 'คำขอจองห้องประชุมได้รับการอนุมัติแล้ว 🎉' : `การจองห้องประชุมได้รับการอนุมัติ (${b.department})`,
-          message: `หัวข้อ "${b.topic}" ได้รับการอนุมัติเรียบร้อยแล้ว เข้าใช้งานได้ตามวันและเวลาที่ระบุ`,
-          timestamp: b.createdAt || b.startTime,
-          bookingId: b.id,
-          department: b.department,
-          requesterName: b.requesterName,
-          isRead: readIdsSet.has(`booking_approved_${b.id}`),
-          severity: 'success'
-        });
+        if (isMine) {
+          list.push({
+            id: `booking_approved_${b.id}`,
+            type: 'booking_approved',
+            title: 'คำขอจองห้องประชุมได้รับการอนุมัติแล้ว 🎉',
+            message: `หัวข้อ "${b.topic}" ได้รับการอนุมัติเรียบร้อยแล้ว เข้าใช้งานได้ตามวันและเวลาที่ระบุ`,
+            timestamp: b.createdAt || b.startTime,
+            bookingId: b.id,
+            department: b.department,
+            requesterName: b.requesterName,
+            isRead: readIdsSet.has(`booking_approved_${b.id}`),
+            severity: 'success'
+          });
+        }
       } else if (b.status === 'rejected') {
-        list.push({
-          id: `booking_rejected_${b.id}`,
-          type: 'booking_rejected',
-          title: isMine ? 'คำขอจองห้องประชุมไม่ได้รับอนุมัติ' : `คำขอจองห้องไม่ได้รับอนุมัติ (${b.department})`,
-          message: `หัวข้อ "${b.topic}" ${b.rejectionReason ? `(เหตุผล: ${b.rejectionReason})` : ''}`,
-          timestamp: b.createdAt || b.startTime,
-          bookingId: b.id,
-          department: b.department,
-          requesterName: b.requesterName,
-          isRead: readIdsSet.has(`booking_rejected_${b.id}`),
-          severity: 'error'
-        });
+        if (isMine) {
+          list.push({
+            id: `booking_rejected_${b.id}`,
+            type: 'booking_rejected',
+            title: 'คำขอจองห้องประชุมไม่ได้รับอนุมัติ',
+            message: `หัวข้อ "${b.topic}" ${b.rejectionReason ? `(เหตุผล: ${b.rejectionReason})` : ''}`,
+            timestamp: b.createdAt || b.startTime,
+            bookingId: b.id,
+            department: b.department,
+            requesterName: b.requesterName,
+            isRead: readIdsSet.has(`booking_rejected_${b.id}`),
+            severity: 'error'
+          });
+        }
       } else if (b.status === 'cancelled') {
         list.push({
           id: `booking_cancelled_${b.id}`,
           type: 'booking_cancelled',
-          title: `การจองห้องประชุมถูกยกเลิก`,
+          title: isMine ? 'การจองห้องประชุมของคุณถูกยกเลิก' : `การจองห้องประชุมถูกยกเลิก (${b.department})`,
           message: `หัวข้อ "${b.topic}" ${b.cancellationReason ? `(เหตุผล: ${b.cancellationReason})` : ''}`,
           timestamp: b.cancelledAt || b.createdAt || b.startTime,
           bookingId: b.id,
@@ -185,16 +189,36 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [bookings, users, emailNotifications, currentUser, readIdsSet, deletedIdsSet]);
 
-  // Auto mark all visible notifications as read on opening
-  useEffect(() => {
-    if (isOpen && notifications.length > 0) {
-      const allIds = notifications.map((n) => n.id);
-      setLocalReadIds((prev) => new Set([...prev, ...allIds]));
-      if (onMarkNotificationsRead) {
-        onMarkNotificationsRead(allIds);
+  // Tab counts
+  const tabCounts = useMemo(() => {
+    let all = notifications.length;
+    let bCount = 0;
+    let sCount = 0;
+    let uAll = 0;
+    let uB = 0;
+    let uS = 0;
+
+    notifications.forEach((n) => {
+      const isBooking = n.type.startsWith('booking_');
+      if (isBooking) {
+        bCount++;
+        if (!n.isRead) uB++;
+      } else {
+        sCount++;
+        if (!n.isRead) uS++;
       }
-    }
-  }, [isOpen, notifications.length, onMarkNotificationsRead]);
+      if (!n.isRead) uAll++;
+    });
+
+    return {
+      allCount: all,
+      bookingsCount: bCount,
+      systemCount: sCount,
+      unreadAll: uAll,
+      unreadBookings: uB,
+      unreadSystem: uS
+    };
+  }, [notifications]);
 
   // Filtered notifications
   const filteredNotifications = useMemo(() => {
@@ -225,7 +249,7 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
     });
   }, [notifications, activeTab, filterType, searchTerm]);
 
-  // Auto-call parent update when unread count changes
+  // Unread count
   const unreadCount = useMemo(() => {
     return notifications.filter((n) => !n.isRead).length;
   }, [notifications]);
@@ -368,6 +392,22 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
           <div className="flex items-center bg-gray-200/70 p-1 rounded-2xl gap-1 overflow-x-auto no-scrollbar">
             <button
               type="button"
+              onClick={() => setActiveTab('all')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition ${
+                activeTab === 'all' ? 'bg-white text-[#C8102E] shadow-2xs' : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <span>ทั้งหมด</span>
+              <span
+                className={`px-1.5 py-0.2 text-[10px] rounded-full font-extrabold ${
+                  tabCounts.unreadAll > 0 ? 'bg-[#C8102E] text-white' : 'bg-gray-200 text-gray-700'
+                }`}
+              >
+                {tabCounts.allCount}
+              </span>
+            </button>
+            <button
+              type="button"
               onClick={() => setActiveTab('bookings')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition ${
                 activeTab === 'bookings' ? 'bg-white text-[#C8102E] shadow-2xs' : 'text-gray-600 hover:text-gray-900'
@@ -375,6 +415,13 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
             >
               <Calendar size={14} />
               <span>การจองห้อง</span>
+              <span
+                className={`px-1.5 py-0.2 text-[10px] rounded-full font-extrabold ${
+                  tabCounts.unreadBookings > 0 ? 'bg-[#C8102E] text-white' : 'bg-gray-200 text-gray-700'
+                }`}
+              >
+                {tabCounts.bookingsCount}
+              </span>
             </button>
             {currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager') && (
               <button
@@ -386,6 +433,13 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
               >
                 <UserCheck size={14} />
                 <span>สมาชิก/ระบบ</span>
+                <span
+                  className={`px-1.5 py-0.2 text-[10px] rounded-full font-extrabold ${
+                    tabCounts.unreadSystem > 0 ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700'
+                  }`}
+                >
+                  {tabCounts.systemCount}
+                </span>
               </button>
             )}
           </div>
@@ -458,11 +512,16 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
                     bgCard = 'bg-blue-50/20 hover:bg-blue-50/50 border-blue-200';
                   }
 
+                  const isUnread = !item.isRead;
+                  const borderLeftStyle = isUnread
+                    ? 'border-l-4 border-l-[#C8102E] ring-1 ring-red-200/60 shadow-xs'
+                    : 'border-l-4 border-l-transparent opacity-90';
+
                   return (
                     <div
                       key={item.id}
                       onClick={() => handleItemClick(item)}
-                      className={`p-4 rounded-2xl border transition shadow-2xs cursor-pointer flex items-start justify-between gap-3.5 ${bgCard}`}
+                      className={`p-4 rounded-2xl border transition cursor-pointer flex items-start justify-between gap-3.5 ${bgCard} ${borderLeftStyle}`}
                     >
                       <div className="flex items-start gap-3.5 min-w-0">
                         <div className="p-2.5 rounded-2xl bg-white shadow-2xs border border-gray-100 shrink-0 mt-0.5">
@@ -471,11 +530,17 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
 
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h4 className="text-xs sm:text-sm font-bold text-gray-900 leading-snug">
+                            <h4
+                              className={`text-xs sm:text-sm leading-snug ${
+                                isUnread ? 'font-black text-gray-950' : 'font-bold text-gray-800'
+                              }`}
+                            >
                               {item.title}
                             </h4>
-                            {!item.isRead && (
-                              <span className="w-2 h-2 rounded-full bg-[#C8102E] shrink-0" />
+                            {isUnread && (
+                              <span className="text-[10px] font-black px-1.5 py-0.2 rounded-md bg-[#C8102E] text-white shrink-0">
+                                ใหม่
+                              </span>
                             )}
                           </div>
 

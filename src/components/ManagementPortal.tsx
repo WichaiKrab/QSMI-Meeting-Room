@@ -47,8 +47,10 @@ import { AdminReports } from './AdminReports';
 import { MyProfileTab } from './MyProfileTab';
 import { DepartmentManagementTab } from './DepartmentManagementTab';
 import { ImportExcelModal } from './ImportExcelModal';
+import { MyBookingsTab } from './MyBookingsTab';
 
 interface ManagementPortalProps {
+  initialTab?: 'approvals' | 'users' | 'bookings' | 'my_history' | 'rooms' | 'reports' | 'directory' | 'departments' | 'my_profile';
   currentUser: UserAccount | null;
   isAuthenticated: boolean;
   isAdminMode: boolean;
@@ -88,6 +90,7 @@ interface ManagementPortalProps {
 }
 
 export const ManagementPortal: React.FC<ManagementPortalProps> = ({
+  initialTab,
   currentUser,
   isAuthenticated,
   isAdminMode,
@@ -174,19 +177,27 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
   const [activeTab, setActiveTab] = useState<
     'approvals' | 'users' | 'bookings' | 'my_history' | 'rooms' | 'reports' | 'directory' | 'departments' | 'my_profile'
   >(() => {
-    if (currentUser?.role === 'employee') return 'my_profile';
+    if (initialTab) return initialTab;
+    if (currentUser?.role === 'employee') return 'my_history';
     return 'approvals';
   });
 
   const isAdmin = currentUser?.role === 'admin' || isAuthenticated;
   const isManager = currentUser?.role === 'manager';
 
+  // Sync activeTab when initialTab changes
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
   // Guard active tab according to strict role constraints
   useEffect(() => {
     if (currentUser) {
       if (currentUser.role === 'employee') {
         if (activeTab !== 'my_profile' && activeTab !== 'my_history') {
-          setActiveTab('my_profile');
+          setActiveTab('my_history');
         }
       } else if (currentUser.role === 'manager') {
         if (
@@ -271,6 +282,17 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
   const displayedApprovals = useMemo(() => {
     return pendingApprovals.slice(0, approvalsDisplayLimit);
   }, [pendingApprovals, approvalsDisplayLimit]);
+
+  // Compute My Bookings count for the current user
+  const myBookingsCount = useMemo(() => {
+    if (!currentUser) return 0;
+    return bookings.filter(
+      (b) =>
+        b.requesterName === currentUser.name ||
+        b.email === currentUser.email ||
+        (currentUser.phone && b.phone === currentUser.phone)
+    ).length;
+  }, [bookings, currentUser]);
 
   // Compute Pending User Registrations (for Admin) - Sorted latest registered first
   const pendingUsers = useMemo(() => {
@@ -598,7 +620,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                     roleTab === 'manager' ? 'bg-blue-600 text-white shadow-2xs' : 'text-blue-700 hover:bg-blue-50'
                   }`}
                 >
-                  <Briefcase size={12} /> Admin
+                  <ShieldCheck size={12} /> Admin
                 </button>
                 <button
                   type="button"
@@ -737,13 +759,12 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="รหัสผ่านทดสอบ 1234 หรือ admin123"
+                      placeholder="กรอกรหัสผ่าน..."
                       className="w-full p-2.5 border border-gray-300 rounded-xl text-xs sm:text-sm font-medium text-gray-900 outline-none focus:ring-2 focus:ring-[#C8102E]"
                     />
                   </div>
 
                   <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-[11px] text-gray-500 space-y-0.5">
-                    <div><strong>รหัสผ่านทดสอบ:</strong> 1234 (สำหรับ Admin: admin123 หรือ 1234)</div>
                     <div>ระบบจะบันทึกสถานะการเข้าสู่ระบบไว้จนกว่าจะกดออกจากระบบ</div>
                   </div>
 
@@ -892,7 +913,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
     <div className="w-full max-w-[1850px] mx-auto py-4 px-3 sm:px-6 lg:px-8 space-y-4">
       {/* Top Banner & Identity Bar */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-3 sm:p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <div
             className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-base shrink-0 ${
               currentUser?.avatarColor || 'bg-red-600'
@@ -900,7 +921,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
           >
             {currentUser?.name.charAt(0) || 'A'}
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-base sm:text-lg font-bold text-gray-900 truncate">
                 {currentUser?.name || 'ผู้ดูแลระบบสูงสุด (Super Admin)'}
@@ -921,9 +942,15 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                   : 'ผู้ใช้งานทั่วไป (User)'}
               </span>
             </div>
-            <div className="text-xs text-gray-500 truncate flex items-center gap-2 mt-0.5">
+            <div className="text-xs text-gray-500 flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
               <span>{currentUser?.department}</span>
-              {currentUser?.title && <span>• {currentUser.title}</span>}
+              {currentUser?.title &&
+                currentUser.title !== 'ผู้ดูแลระบบสูงสุด (Super Admin)' &&
+                currentUser.title !== 'ผู้ดูแลระบบ (Admin)' &&
+                currentUser.title !== 'ผู้ใช้งานทั่วไป (User)' &&
+                !currentUser.title.toLowerCase().includes('admin') && (
+                  <span>• {currentUser.title}</span>
+                )}
               <span className="font-mono text-gray-400">({currentUser?.username})</span>
             </div>
           </div>
@@ -979,6 +1006,11 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
         >
           <CalendarCheck size={16} className={activeTab === 'my_history' ? 'text-emerald-400' : 'text-gray-500'} />
           <span>รายการจองของฉัน</span>
+          {myBookingsCount > 0 && (
+            <span className="px-1.5 py-0.2 text-[10px] font-extrabold bg-[#C8102E] text-white rounded-full">
+              {myBookingsCount}
+            </span>
+          )}
         </button>
 
         {/* Tab 3: Approvals (อนุมัติการจองห้อง) - Admin & Manager */}
@@ -2232,83 +2264,17 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
         )}
 
         {/* ==================================================== */}
-        {/* TAB 4: MY HISTORY (Employee / Manager) */}
+        {/* TAB 4: MY HISTORY (Available to Super Admin, Admin, and User) */}
         {/* ==================================================== */}
-        {activeTab === 'my_history' && !isAdmin && (
-          <div className="space-y-4">
-            <div className="border-b border-gray-100 pb-3">
-              <h3 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2">
-                <CalendarCheck className="text-emerald-600" size={20} />
-                <span>ประวัติและรายการจองห้องประชุมของฉัน</span>
-              </h3>
-              <p className="text-xs text-gray-500">
-                รายการจองที่ทำโดย {currentUser?.name} ({currentUser?.department})
-              </p>
-            </div>
-
-            {/* List of my bookings */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {bookings
-                .filter(
-                  (b) =>
-                    b.requesterName === currentUser?.name ||
-                    b.email === currentUser?.email
-                )
-                .map((b) => {
-                  const room = rooms.find((r) => r.id === b.roomId);
-                  const bStart = new Date(b.startTime);
-                  const bEnd = new Date(b.endTime);
-
-                  return (
-                    <div
-                      key={b.id}
-                      className="p-4 rounded-2xl border border-gray-200 bg-white hover:shadow-xs transition flex flex-col justify-between gap-3"
-                    >
-                      <div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-mono text-xs text-gray-400 font-bold">{b.id}</span>
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              b.status === 'approved'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : b.status === 'pending'
-                                ? 'bg-amber-100 text-amber-800'
-                                : 'bg-red-100 text-red-800'
-                            }`}
-                          >
-                            {b.status === 'approved' ? 'อนุมัติแล้ว' : b.status === 'pending' ? 'รออนุมัติ' : 'ยกเลิก/ปฏิเสธ'}
-                          </span>
-                        </div>
-                        <h4 className="text-sm font-bold text-gray-900 mt-1.5">{b.topic}</h4>
-                        <p className="text-xs text-blue-700 font-semibold mt-0.5">{room?.name}</p>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {formatThaiDate(bStart)} ({formatThaiTime(bStart, { hour: '2-digit', minute: '2-digit' })} - {formatThaiTime(bEnd, { hour: '2-digit', minute: '2-digit' })} น.)
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
-                        <button
-                          type="button"
-                          onClick={() => onViewBooking(b)}
-                          className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition"
-                        >
-                          ดูรายละเอียด
-                        </button>
-                        {b.status === 'approved' && (
-                          <button
-                            type="button"
-                            onClick={() => onRequestCancel(b)}
-                            className="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition"
-                          >
-                            ขอยกเลิก
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          </div>
+        {activeTab === 'my_history' && (
+          <MyBookingsTab
+            bookings={bookings}
+            rooms={rooms}
+            currentUser={currentUser}
+            onViewBooking={onViewBooking}
+            onRequestCancel={onRequestCancel}
+            onOpenNewBooking={onBackToBooking}
+          />
         )}
 
         {/* ==================================================== */}

@@ -180,8 +180,8 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
         </span>
       </button>
 
-      {/* Right: View Mode Selector & Quick Booking Button */}
-      <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+      {/* Right: View Mode Selector */}
+      <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
         <div className="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200">
           {(['day', 'week', 'month'] as CalendarView[]).map((mode) => {
             const label = mode === 'day' ? 'วัน' : mode === 'week' ? 'สัปดาห์' : 'เดือน';
@@ -200,18 +200,6 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
             );
           })}
         </div>
-
-        {onQuickBook && (
-          <button
-            type="button"
-            onClick={onQuickBook}
-            className="flex items-center gap-1.5 px-3 sm:px-4 py-2 bg-[#C8102E] hover:bg-[#a00c24] text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs transition active:scale-95 shrink-0"
-            title="กดเพื่อจองห้องประชุมทันที"
-          >
-            <Plus size={16} />
-            <span>จองห้องประชุม</span>
-          </button>
-        )}
       </div>
     </div>
   );

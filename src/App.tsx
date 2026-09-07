@@ -48,8 +48,6 @@ import { WeekView } from './components/WeekView';
 import { MonthView } from './components/MonthView';
 import { BookingModal } from './components/BookingModal';
 import { BookingDetailModal } from './components/BookingDetailModal';
-import { MyBookingsModal } from './components/MyBookingsModal';
-import { ManagerApprovalModal } from './components/ManagerApprovalModal';
 import { AdminReports } from './components/AdminReports';
 import { AdminManageTable } from './components/AdminManageTable';
 import { SsoLoginModal } from './components/SsoLoginModal';
@@ -208,8 +206,9 @@ export default function App() {
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [isMyBookingsOpen, setIsMyBookingsOpen] = useState(false);
-  const [isManagerPortalOpen, setIsManagerPortalOpen] = useState(false);
+  const [managementInitialTab, setManagementInitialTab] = useState<
+    'approvals' | 'users' | 'bookings' | 'my_history' | 'rooms' | 'reports' | 'directory' | 'departments' | 'my_profile'
+  >('approvals');
   const [isSsoModalOpen, setIsSsoModalOpen] = useState(false);
   const [pendingBookingSlot, setPendingBookingSlot] = useState<{
     room: Room;
@@ -425,7 +424,7 @@ export default function App() {
     ).length;
   }, [bookings, currentUser]);
 
-  // Pending bookings count for Admin & Super Admin (all users)
+  // Pending bookings count for Super Admin & Admin (all pending bookings)
   const pendingDeptCount = useMemo(() => {
     if (!currentUser || (currentUser.role !== 'manager' && currentUser.role !== 'admin')) return 0;
     return bookings.filter(
@@ -559,9 +558,9 @@ export default function App() {
       if (b.status === 'pending') {
         checkAndIncrement(`booking_pending_${b.id}`);
       } else if (b.status === 'approved') {
-        checkAndIncrement(`booking_approved_${b.id}`);
+        if (isMine) checkAndIncrement(`booking_approved_${b.id}`);
       } else if (b.status === 'rejected') {
-        checkAndIncrement(`booking_rejected_${b.id}`);
+        if (isMine) checkAndIncrement(`booking_rejected_${b.id}`);
       } else if (b.status === 'cancelled') {
         checkAndIncrement(`booking_cancelled_${b.id}`);
       }
@@ -773,6 +772,7 @@ export default function App() {
           requesterName: formData.requesterName,
           phone: formData.phone,
           email: formData.email,
+          username: currentUser?.username || formData.username || '',
           institute: formData.institute,
           startTime: startDateTime.toISOString(),
           endTime: endDateTime.toISOString(),
@@ -1205,10 +1205,10 @@ export default function App() {
           label: 'ระดับสิทธิ์',
           value:
             target.role === 'admin'
-              ? 'ผู้ดูแลระบบ (Admin)'
+              ? 'ผู้ดูแลระบบสูงสุด (Super Admin)'
               : target.role === 'manager'
-                ? 'หัวหน้าฝ่าย (Manager)'
-                : 'พนักงานทั่วไป (Employee)'
+                ? 'ผู้ดูแลระบบ (Admin)'
+                : 'ผู้ใช้งานทั่วไป (User)'
         }
       ],
       onConfirm: () => {
@@ -1348,7 +1348,16 @@ export default function App() {
         pendingDeptCount={pendingDeptCount}
         pendingUsersCount={pendingUsers.length}
         totalNotificationsCount={totalNotificationsCount}
-        onOpenMyBookings={() => setIsMyBookingsOpen(true)}
+        onOpenMyBookings={() => {
+          if (!currentUser) {
+            setPendingBookingSlot(null);
+            setLoginModalReason('กรุณาเข้าสู่ระบบก่อน เพื่อดูรายการจองของฉัน');
+            setIsSsoModalOpen(true);
+            return;
+          }
+          setManagementInitialTab('my_history');
+          setActivePage('management');
+        }}
         onOpenGuide={() => setIsGuideModalOpen(true)}
         onOpenEmailInbox={() => {
           if (!currentUser) {
@@ -1391,6 +1400,7 @@ export default function App() {
         /* PAGE 2: USER & ADMIN MANAGEMENT / PORTAL */
         <main className="flex-1 overflow-y-auto w-full no-scrollbar">
           <ManagementPortal
+            initialTab={managementInitialTab}
             currentUser={currentUser}
             isAuthenticated={isAuthenticated}
             isAdminMode={isAdminMode}
@@ -1647,16 +1657,17 @@ export default function App() {
         }}
       />
 
-      {/* 4. Admin Password Modal */}
+      {/* 4. Admin Login Modal */}
       <AdminLoginModal
         isOpen={isAdminLoginModalOpen}
         onClose={() => setIsAdminLoginModalOpen(false)}
-        onSuccess={() => {
+        users={users}
+        onSuccess={(adminUser) => {
           setIsAuthenticated(true);
           setIsAdminMode(true);
-          const adminUser = users.find((u) => u.role === 'admin') || CORPORATE_USERS[0];
-          setCurrentUser(adminUser);
-          showToast(`เข้าสู่ระบบผู้ดูแลระบบ (Admin) สำเร็จ: ${adminUser.name}`, 'success');
+          const targetAdmin = adminUser || users.find((u) => u.role === 'admin') || CORPORATE_USERS[0];
+          setCurrentUser(targetAdmin);
+          showToast(`เข้าสู่ระบบผู้ดูแลระบบ (Admin) สำเร็จ: ${targetAdmin.name}`, 'success');
         }}
       />
 
@@ -1778,46 +1789,7 @@ export default function App() {
         onConfirm={handleConfirmResend}
       />
 
-      {/* 12. My Bookings History & Cancellation Portal */}
-      <MyBookingsModal
-        isOpen={isMyBookingsOpen}
-        onClose={() => setIsMyBookingsOpen(false)}
-        bookings={bookings}
-        rooms={rooms}
-        currentUser={currentUser}
-        onViewBooking={(b) => {
-          setViewingBooking(b);
-          setIsDetailModalOpen(true);
-        }}
-        onRequestCancel={(b) => {
-          setTargetCancelBooking(b);
-          setIsCancelModalOpen(true);
-        }}
-        onOpenNewBooking={() => {
-          setIsMyBookingsOpen(false);
-          setSelectedSlotRoom(undefined);
-          setSelectedSlotTime(null);
-          setEditingBooking(null);
-          setIsBookingModalOpen(true);
-        }}
-      />
-
-      {/* 13. Department Manager Approval & Usage Statistics Portal */}
-      <ManagerApprovalModal
-        isOpen={isManagerPortalOpen}
-        onClose={() => setIsManagerPortalOpen(false)}
-        bookings={bookings}
-        rooms={rooms}
-        currentUser={currentUser}
-        onApprove={handleApprove}
-        onReject={handleRejectClick}
-        onViewBooking={(b) => {
-          setViewingBooking(b);
-          setIsDetailModalOpen(true);
-        }}
-      />
-
-      {/* 14. Universal Delete Confirmation Modal (Theme-Consistent Custom Modal) */}
+      {/* 13. Universal Delete Confirmation Modal (Theme-Consistent Custom Modal) */}
       <DeleteConfirmModal
         isOpen={deleteModalState.isOpen}
         onClose={() => setDeleteModalState((prev) => ({ ...prev, isOpen: false }))}

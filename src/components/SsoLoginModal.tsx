@@ -151,7 +151,7 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
       password: regPassword,
       name: regName.trim(),
       department: regDept,
-      title: regTitle.trim() || (regRole === 'manager' ? 'หัวหน้าฝ่าย' : 'เจ้าหน้าที่'),
+      title: regTitle.trim() || (regRole === 'manager' ? 'ผู้ดูแลระบบ' : 'เจ้าหน้าที่'),
       role: regRole,
       email: regEmail.trim() || `${regUsername.trim().toLowerCase()}@qsmi.or.th`,
       phone: regPhone.trim() || '022520161',

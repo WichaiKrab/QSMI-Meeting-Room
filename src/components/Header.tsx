@@ -176,25 +176,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           )}
 
-          {/* My Bookings (Shown on tablet and desktop, hidden on mobile to avoid overflow) */}
-          {currentUser && (
-            <button
-              type="button"
-              onClick={onOpenMyBookings}
-              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-1.5 rounded-xl border border-red-200 bg-red-50/70 hover:bg-red-100/70 text-[#C8102E] text-xs sm:text-sm font-bold transition shadow-2xs"
-              title="ดูรายการจองของฉัน และยกเลิกการจอง"
-            >
-              <CalendarCheck size={16} />
-              <span className="hidden md:inline">รายการจองของฉัน</span>
-              {myBookingsCount > 0 && (
-                <span className="inline-flex items-center justify-center px-1.5 py-0.2 text-[10px] font-extrabold text-white bg-[#C8102E] rounded-full">
-                  {myBookingsCount}
-                </span>
-              )}
-            </button>
-          )}
-
-          {/* Notification Center Button (Only visible when user is logged in) */}
+              {/* Notification Center Button (Only visible when user is logged in) */}
           {currentUser && (
             <button
               type="button"
@@ -204,9 +186,9 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Bell size={16} className="text-amber-600 group-hover:scale-110 transition shrink-0" />
               <span className="hidden lg:inline ml-1.5">การแจ้งเตือน</span>
-              {(totalNotificationsCount > 0 || unreadEmailCount > 0) && (
+              {totalNotificationsCount > 0 && (
                 <span className="absolute -top-1 -right-1 sm:static sm:ml-1.5 inline-flex items-center justify-center px-1.5 py-0.2 text-[10px] font-bold text-white bg-[#C8102E] rounded-full animate-pulse">
-                  {totalNotificationsCount + unreadEmailCount}
+                  {totalNotificationsCount}
                 </span>
               )}
             </button>
@@ -445,9 +427,9 @@ export const Header: React.FC<HeaderProps> = ({
                         </div>
                         <span>ศูนย์การแจ้งเตือน</span>
                       </div>
-                      {(totalNotificationsCount > 0 || unreadEmailCount > 0) && (
+                      {totalNotificationsCount > 0 && (
                         <span className="px-1.5 py-0.2 text-[10px] font-bold text-white bg-[#C8102E] rounded-full">
-                          {totalNotificationsCount + unreadEmailCount}
+                          {totalNotificationsCount}
                         </span>
                       )}
                     </button>
