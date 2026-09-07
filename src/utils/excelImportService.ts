@@ -18,17 +18,80 @@ export interface ImportValidationResult {
   readyBookings: Booking[];
 }
 
+export interface ImportValidationOptions {
+  disallowPastBookings?: boolean;
+}
+
 /**
- * Normalizes Thai date strings such as "15/09/2569", "2026-09-15", or Excel serial date
+ * Thai month mappings for parsing Thai date strings
+ */
+const THAI_MONTH_MAP: Record<string, string> = {
+  'ม.ค.': '01',
+  'มกราคม': '01',
+  'ก.พ.': '02',
+  'กุมภาพันธ์': '02',
+  'มี.ค.': '03',
+  'มีนาคม': '03',
+  'เม.ย.': '04',
+  'เมษายน': '04',
+  'พ.ค.': '05',
+  'พฤษภาคม': '05',
+  'มิ.ย.': '06',
+  'มิถุนายน': '06',
+  'ก.ค.': '07',
+  'กรกฎาคม': '07',
+  'ส.ค.': '08',
+  'สิงหาคม': '08',
+  'ก.ย.': '09',
+  'กันยายน': '09',
+  'ต.ค.': '10',
+  'ตุลาคม': '10',
+  'พ.ย.': '11',
+  'พฤศจิกายน': '11',
+  'ธ.ค.': '12',
+  'ธันวาคม': '12',
+  'jan': '01',
+  'feb': '02',
+  'mar': '03',
+  'apr': '04',
+  'may': '05',
+  'jun': '06',
+  'jul': '07',
+  'aug': '08',
+  'sep': '09',
+  'oct': '10',
+  'nov': '11',
+  'dec': '12'
+};
+
+/**
+ * Normalizes Thai date strings such as "15/09/2569", "2026-09-15", "15 ก.ย. 2569", or Excel serial date
  */
 export const parseExcelDate = (val: any): string | null => {
-  if (!val) return null;
+  if (val === null || val === undefined || val === '') return null;
 
+  // 1. If val is a Date object (SheetJS with cellDates: true)
   if (val instanceof Date && !isNaN(val.getTime())) {
     const y = val.getFullYear();
     const m = String(val.getMonth() + 1).padStart(2, '0');
     const d = String(val.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
+  }
+
+  // 2. If val is a number (Excel Serial Date code, e.g. 45678)
+  if (typeof val === 'number' && val > 1000 && val < 100000) {
+    try {
+      // Excel serial date to JavaScript Date: days since 1899-12-30
+      const date = new Date(Math.round((val - 25569) * 86400 * 1000));
+      if (!isNaN(date.getTime())) {
+        const y = date.getUTCFullYear();
+        const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const d = String(date.getUTCDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      }
+    } catch {
+      // ignore
+    }
   }
 
   const str = String(val).trim();
@@ -46,16 +109,42 @@ export const parseExcelDate = (val: any): string | null => {
   }
 
   // Pattern DD/MM/YYYY or D/M/YYYY
-  const dmyMatch = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+  const dmyMatch = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
   if (dmyMatch) {
     let year = parseInt(dmyMatch[3], 10);
-    if (year > 2400) year -= 543;
+    if (year < 100) {
+      // 2-digit year (e.g. 69 -> 2569 -> 2026, or 26 -> 2026)
+      if (year >= 50) year += 2500 - 543;
+      else year += 2000;
+    } else if (year > 2400) {
+      year -= 543;
+    }
     const month = String(parseInt(dmyMatch[2], 10)).padStart(2, '0');
     const day = String(parseInt(dmyMatch[1], 10)).padStart(2, '0');
     return `${year}-${month}-${day}`;
   }
 
-  // Fallback: try parsing Date string
+  // Pattern with Thai Month name, e.g. "15 ก.ย. 2569", "15 กันยายน 2569"
+  for (const [thMonth, mNum] of Object.entries(THAI_MONTH_MAP)) {
+    if (str.includes(thMonth)) {
+      const parts = str.split(/[\s,.-]+/);
+      const dayCandidate = parts.find((p) => /^\d{1,2}$/.test(p));
+      const yearCandidate = parts.find((p) => /^\d{2,4}$/.test(p) && p !== dayCandidate);
+      if (dayCandidate && yearCandidate) {
+        let year = parseInt(yearCandidate, 10);
+        if (year < 100) {
+          if (year >= 50) year += 2500 - 543;
+          else year += 2000;
+        } else if (year > 2400) {
+          year -= 543;
+        }
+        const day = String(parseInt(dayCandidate, 10)).padStart(2, '0');
+        return `${year}-${mNum}-${day}`;
+      }
+    }
+  }
+
+  // Fallback: try parsing standard Date string
   const parsed = new Date(str);
   if (!isNaN(parsed.getTime())) {
     let year = parsed.getFullYear();
@@ -69,15 +158,34 @@ export const parseExcelDate = (val: any): string | null => {
 };
 
 /**
- * Normalizes time strings e.g. "09:00", "9:00", "09.30", "9.30", "09:00:00"
+ * Normalizes time strings e.g. "09:00", "9:00", "09.30", "9.30", "09:00:00", or Excel fractional day number (e.g. 0.375)
  */
 export const parseExcelTime = (val: any): string | null => {
-  if (!val) return null;
+  if (val === null || val === undefined || val === '') return null;
 
+  // 1. If val is a Date object (SheetJS)
   if (val instanceof Date && !isNaN(val.getTime())) {
     const h = String(val.getHours()).padStart(2, '0');
     const m = String(val.getMinutes()).padStart(2, '0');
     return `${h}:${m}`;
+  }
+
+  // 2. If val is an Excel fractional day number (e.g. 0.375 = 09:00, 0.5 = 12:00)
+  if (typeof val === 'number') {
+    if (val >= 0 && val < 1) {
+      const totalSeconds = Math.round(val * 86400);
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+    // If entered as integer e.g. 900 (09:00) or 1330 (13:30)
+    if (val >= 100 && val <= 2400) {
+      const h = Math.floor(val / 100);
+      const m = val % 100;
+      if (h < 24 && m < 60) {
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      }
+    }
   }
 
   let str = String(val).trim();
@@ -100,6 +208,23 @@ export const parseExcelTime = (val: any): string | null => {
   }
 
   return null;
+};
+
+/**
+ * Helper to safely save a Blob to a file in browser/iframe environments
+ */
+const saveBlobToFile = (blob: Blob, filename: string) => {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  setTimeout(() => {
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }, 1000);
 };
 
 /**
@@ -131,7 +256,7 @@ export const downloadBookingTemplate = (rooms: Room[]) => {
     'หมายเหตุ/รายละเอียดเพิ่มเติม'
   ];
 
-  // Prepare a date in the future for sample data
+  // Prepare dates in the future for sample data
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const sampleYear = tomorrow.getFullYear();
@@ -193,7 +318,7 @@ export const downloadBookingTemplate = (rooms: Room[]) => {
   // Set column widths for readability
   ws['!cols'] = [
     { wch: 35 }, // หัวข้อ
-    { wch: 32 }, // ห้องประชุม
+    { wch: 34 }, // ห้องประชุม
     { wch: 22 }, // ผู้จอง
     { wch: 22 }, // ฝ่าย
     { wch: 15 }, // เบอร์โทร
@@ -242,16 +367,109 @@ export const downloadBookingTemplate = (rooms: Room[]) => {
   guideWs['!cols'] = [{ wch: 15 }, { wch: 38 }, { wch: 28 }, { wch: 14 }, { wch: 18 }];
   XLSX.utils.book_append_sheet(wb, guideWs, 'รายชื่อห้องประชุม (Rooms Reference)');
 
-  // Generate and trigger download
-  XLSX.writeFile(wb, 'meeting_room_booking_template.xlsx');
+  // Generate binary output and save using native Blob (works 100% reliably in browser & iframe)
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([wbout], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8'
+  });
+  saveBlobToFile(blob, 'meeting_room_booking_template.xlsx');
 };
 
 /**
- * Match room input string to existing system rooms
+ * Download CSV Template (.csv) with UTF-8 BOM so Excel opens Thai characters seamlessly
+ */
+export const downloadBookingCsvTemplate = (rooms: Room[]) => {
+  const headers = [
+    'หัวข้อการประชุม',
+    'ห้องประชุม',
+    'ชื่อ-นามสกุล ผู้ขอจอง',
+    'ฝ่าย/กลุ่มงาน',
+    'เบอร์โทรศัพท์',
+    'อีเมล',
+    'หน่วยงานภายนอก/สถาบันเข้าร่วม',
+    'วันที่เริ่มต้น (YYYY-MM-DD)',
+    'วันที่สิ้นสุด (YYYY-MM-DD)',
+    'เวลาเริ่มต้น (HH:mm)',
+    'เวลาสิ้นสุด (HH:mm)',
+    'จำนวนผู้เข้าร่วม (คน)',
+    'อาหารว่าง (ชุด)',
+    'อาหารกลางวัน (กล่อง/ชุด)',
+    'เครื่องดื่ม (แก้ว/ขวด)',
+    'อุปกรณ์ที่ขอใช้',
+    'รูปแบบการจัดโต๊ะ',
+    'รูปแบบการประชุม (Onsite/Online)',
+    'หมายเหตุ/รายละเอียดเพิ่มเติม'
+  ];
+
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const sampleYear = tomorrow.getFullYear();
+  const sampleMonth = String(tomorrow.getMonth() + 1).padStart(2, '0');
+  const sampleDay = String(tomorrow.getDate()).padStart(2, '0');
+  const sampleDateStr = `${sampleYear}-${sampleMonth}-${sampleDay}`;
+
+  const defaultRoom1 = rooms[0]?.name || 'ห้องประชุม 1 อาคารเฉลิมพระเกียรติฯ ชั้น 2';
+  const defaultRoom2 = rooms[1]?.name || 'ห้องประชุม 2 อาคารเฉลิมพระเกียรติฯ ชั้น 2';
+
+  const sampleRows = [
+    [
+      'การประชุมวางแผนงานยุทธศาสตร์ประจำปี 2570',
+      defaultRoom1,
+      'นายกิตติศักดิ์ ศรีวิชัย',
+      'ฝ่ายบริหารงานทั่วไป',
+      '02-256-4214',
+      'kitti.s@qsmi.or.th',
+      '',
+      sampleDateStr,
+      sampleDateStr,
+      '09:00',
+      '12:00',
+      25,
+      25,
+      0,
+      25,
+      'LCD Projector, Computer / Notebook',
+      'แบบห้องเรียน (Classroom)',
+      'Onsite',
+      'ขอความอนุเคราะห์เปิดเครื่องปรับอากาศก่อนเวลา 15 นาที'
+    ],
+    [
+      'อบรมเชิงปฏิบัติการการใช้ระบบเทคโนโลยีสารสนเทศ',
+      defaultRoom2,
+      'นางสาวกาญจนา มณีรัตน์',
+      'ศูนย์สารสนเทศและเทคโนโลยี',
+      '089-123-4567',
+      'kanjana.m@qsmi.or.th',
+      'สำนักงานสารสนเทศสภากาชาดไทย',
+      sampleDateStr,
+      sampleDateStr,
+      '13:30',
+      '16:30',
+      15,
+      15,
+      15,
+      15,
+      'LCD Projector, Computer / Notebook, ถ่ายภาพ',
+      'แบบตัวยู (U-Shape)',
+      'Onsite',
+      'มีวิทยากรภายนอกเข้าร่วม'
+    ]
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
+  const csvStr = XLSX.utils.sheet_to_csv(ws);
+  // Prepend UTF-8 BOM so Thai characters are properly recognized in Excel
+  const blob = new Blob(['\uFEFF' + csvStr], { type: 'text/csv;charset=utf-8;' });
+  saveBlobToFile(blob, 'meeting_room_booking_template.csv');
+};
+
+/**
+ * Smarter room string matching to existing system rooms
  */
 export const findMatchingRoom = (roomStr: string, rooms: Room[]): Room | null => {
   if (!roomStr) return null;
   const clean = roomStr.trim().toLowerCase();
+  const cleanNoSpace = clean.replace(/[\s\-_]/g, '');
 
   // 1. Exact ID match
   const byId = rooms.find((r) => r.id.toLowerCase() === clean);
@@ -261,18 +479,30 @@ export const findMatchingRoom = (roomStr: string, rooms: Room[]): Room | null =>
   const byExactName = rooms.find((r) => r.name.toLowerCase() === clean);
   if (byExactName) return byExactName;
 
-  // 3. Name startsWith or includes
-  const byIncludes = rooms.find(
-    (r) =>
-      r.name.toLowerCase().includes(clean) ||
-      clean.includes(r.name.toLowerCase()) ||
-      (clean.includes('ห้องประชุม 1') && r.name.includes('ห้องประชุม 1')) ||
-      (clean.includes('ห้องประชุม 2') && r.name.includes('ห้องประชุม 2')) ||
-      (clean.includes('ห้องประชุม 3') && r.name.includes('ห้องประชุม 3')) ||
-      (clean.includes('โถง') && r.name.includes('โถง'))
+  // 3. Name match ignoring spaces, dashes, underscores
+  const byNoSpace = rooms.find(
+    (r) => r.name.toLowerCase().replace(/[\s\-_]/g, '') === cleanNoSpace
   );
+  if (byNoSpace) return byNoSpace;
 
-  return byIncludes || null;
+  // 4. Substring / Includes match
+  const byIncludes = rooms.find(
+    (r) => {
+      const rNameNoSpace = r.name.toLowerCase().replace(/[\s\-_]/g, '');
+      return rNameNoSpace.includes(cleanNoSpace) || cleanNoSpace.includes(rNameNoSpace);
+    }
+  );
+  if (byIncludes) return byIncludes;
+
+  // 5. Room number check e.g. "ห้อง 1", "ห้อง 2", "ห้องประชุม 1"
+  const matchNum = clean.match(/ห้อง(?:ประชุม)?\s*([0-9]+)/) || clean.match(/^([0-9]+)$/);
+  if (matchNum) {
+    const num = matchNum[1];
+    const byNum = rooms.find((r) => r.name.includes(`ห้องประชุม ${num}`) || r.name.includes(`ห้อง ${num}`));
+    if (byNum) return byNum;
+  }
+
+  return null;
 };
 
 /**
@@ -281,10 +511,24 @@ export const findMatchingRoom = (roomStr: string, rooms: Room[]): Room | null =>
 export const parseAndValidateImportFile = async (
   file: File,
   rooms: Room[],
-  existingBookings: Booking[]
+  existingBookings: Booking[],
+  options: ImportValidationOptions = {}
 ): Promise<ImportValidationResult> => {
+  const disallowPast = options.disallowPastBookings !== false; // default: true
   const buffer = await file.arrayBuffer();
-  const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
+
+  let wb: XLSX.WorkBook;
+  try {
+    wb = XLSX.read(buffer, { type: 'array', cellDates: true });
+  } catch (err: any) {
+    // If standard read fails (e.g. malformed CSV), try text decode
+    try {
+      const text = new TextDecoder('utf-8').decode(buffer);
+      wb = XLSX.read(text, { type: 'string', cellDates: true });
+    } catch {
+      throw new Error(`ไม่สามารถอ่านไฟล์ได้ (${err?.message || 'รูปแบบไฟล์ไม่ถูกต้อง'})`);
+    }
+  }
 
   const firstSheetName = wb.SheetNames[0];
   if (!firstSheetName) {
@@ -292,22 +536,28 @@ export const parseAndValidateImportFile = async (
   }
 
   const ws = wb.Sheets[firstSheetName];
-  const rawRows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  let rawRows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
   if (!rawRows || rawRows.length < 2) {
     throw new Error('ไฟล์ว่างเปล่าหรือไม่พบแถวข้อมูล (ต้องมีหัวตารางและข้อมูลอย่างน้อย 1 แถว)');
   }
 
-  // Find header row (first non-empty row)
+  // Auto-detect CSV semicolon (;) delimiter if sheet was imported as a single column with semicolons
+  if (rawRows.length > 1 && rawRows[0].length === 1 && String(rawRows[0][0]).includes(';')) {
+    rawRows = rawRows.map((r) => String(r[0] || '').split(';'));
+  }
+
+  // Find header row (first row with keywords)
   let headerRowIndex = 0;
-  for (let i = 0; i < Math.min(5, rawRows.length); i++) {
+  for (let i = 0; i < Math.min(6, rawRows.length); i++) {
     const row = rawRows[i];
     if (
       row.some(
         (cell: any) =>
           String(cell).includes('หัวข้อ') ||
           String(cell).includes('ห้อง') ||
-          String(cell).includes('วันที่')
+          String(cell).includes('วันที่') ||
+          String(cell).toLowerCase().includes('topic')
       )
     ) {
       headerRowIndex = i;
@@ -356,7 +606,7 @@ export const parseAndValidateImportFile = async (
   // Compute next ID counter
   let nextNum =
     existingBookings.reduce((max, b) => {
-      if (b.id.startsWith('MR-')) {
+      if (b.id && b.id.startsWith('MR-')) {
         const n = parseInt(b.id.split('-')[1], 10);
         return !isNaN(n) && n > max ? n : max;
       }
@@ -365,7 +615,7 @@ export const parseAndValidateImportFile = async (
 
   for (let i = 0; i < dataRows.length; i++) {
     const row = dataRows[i];
-    // Skip empty row
+    // Skip completely empty row
     if (!row || row.every((c) => c === '' || c === null || c === undefined)) {
       continue;
     }
@@ -404,7 +654,7 @@ export const parseAndValidateImportFile = async (
     // Validation 2: Room Match
     const matchedRoom = findMatchingRoom(roomStr, rooms);
     if (!matchedRoom) {
-      errors.push(`ไม่พบห้องประชุม "${roomStr}" ในระบบ`);
+      errors.push(`ไม่พบห้องประชุม "${roomStr || 'ว่าง'}" ในระบบ`);
     } else if (!matchedRoom.isActive) {
       errors.push(`ห้องประชุม "${matchedRoom.name}" อยู่ระหว่างปิดปรับปรุง`);
     }
@@ -452,8 +702,8 @@ export const parseAndValidateImportFile = async (
       endDateTime = new Date(endDate);
       endDateTime.setHours(eH, eM, 0, 0);
 
-      // Validation 6: Check past date/time (Requirement 1: ตรวจสอบไม่ให้จองย้อนหลัง)
-      if (startDateTime < oneMinuteGrace) {
+      // Validation 6: Check past date/time (Requirement: ตรวจสอบไม่ให้จองย้อนหลัง)
+      if (disallowPast && startDateTime < oneMinuteGrace) {
         errors.push(`ช่วงเวลาเริ่มต้น (${startDate} ${startTime} น.) เป็นช่วงเวลาย้อนหลังในอดีต`);
       }
 
@@ -464,7 +714,6 @@ export const parseAndValidateImportFile = async (
 
       // Validation 8: Overlap check with existing bookings AND other rows in the same import file
       if (matchedRoom && errors.length === 0) {
-        // Check existing bookings in system
         const overlapResult = checkBookingOverlap(
           [...existingBookings, ...validBatchBookings],
           matchedRoom.id,
@@ -540,3 +789,4 @@ export const parseAndValidateImportFile = async (
     readyBookings: validBatchBookings
   };
 };
+
