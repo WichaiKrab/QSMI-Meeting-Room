@@ -133,24 +133,126 @@ export function subscribeToEmailNotifications(callback: (emails: EmailNotificati
 
 // Bookings
 export async function saveBookingToFirestore(booking: Booking) {
-  await setDoc(doc(db, BOOKINGS_COL, booking.id), booking);
+  await setDoc(doc(db, BOOKINGS_COL, booking.id), booking, { merge: true });
 }
 
 export async function updateBookingInFirestore(bookingId: string, updates: Partial<Booking>) {
-  await updateDoc(doc(db, BOOKINGS_COL, bookingId), updates);
+  await setDoc(doc(db, BOOKINGS_COL, bookingId), updates, { merge: true });
 }
 
 export async function deleteBookingFromFirestore(bookingId: string) {
   await deleteDoc(doc(db, BOOKINGS_COL, bookingId));
 }
 
+export interface ConcurrencyCheckResult {
+  success: boolean;
+  booking?: Booking;
+  conflictWith?: Booking;
+  allFreshBookings?: Booking[];
+  error?: string;
+}
+
+/**
+ * ดึงรายการการจองล่าสุดทั้งหมดจาก Firestore โดยตรง
+ */
+export async function getFreshBookingsFromFirestore(): Promise<Booking[]> {
+  try {
+    const snap = await getDocs(collection(db, BOOKINGS_COL));
+    const items: Booking[] = [];
+    snap.forEach((d) => items.push(d.data() as Booking));
+    return items;
+  } catch (err) {
+    console.warn('Error getting fresh bookings from Firestore:', err);
+    return [];
+  }
+}
+
+/**
+ * บันทึกหรืออัปเดตการจองพร้อมตรวจสอบการจองซ้อนทับแบบเรียลไทม์กับฐานข้อมูลคลาวด์โดยตรง
+ * เพื่อป้องกันปัญหา Race Condition กรณีมีผู้ใช้งานกดจองพร้อมกันในเวลาเดียวกัน
+ */
+export async function saveBookingWithConcurrencyCheck(
+  bookingData: Omit<Booking, 'id'> & { id?: string },
+  roomId: string,
+  startDateTime: Date,
+  endDateTime: Date,
+  excludeId: string | null = null
+): Promise<ConcurrencyCheckResult> {
+  try {
+    // 1. ดึงข้อมูลการจองล่าสุดทั้งหมดจาก Firestore โดยตรง ณ วินาทีที่กดบันทึก
+    const freshBookings = await getFreshBookingsFromFirestore();
+
+    const nStart = startDateTime.getTime();
+    const nEnd = endDateTime.getTime();
+
+    // 2. ตรวจสอบว่ามีรายการใดใน Cloud ที่ทับซ้อนกับห้องและช่วงเวลานี้หรือไม่
+    for (const b of freshBookings) {
+      if (excludeId && b.id === excludeId) continue;
+      if (b.roomId !== roomId) continue;
+      if (b.status === 'rejected' || b.status === 'cancelled') continue;
+
+      const bStart = new Date(b.startTime).getTime();
+      const bEnd = new Date(b.endTime).getTime();
+
+      // เงื่อนไขเวลาซ้อนทับ: เริ่มใหม่ < จบเดิม และ จบใหม่ > เริ่มเดิม
+      if (nStart < bEnd && nEnd > bStart) {
+        return {
+          success: false,
+          conflictWith: b,
+          allFreshBookings: freshBookings,
+          error: `ช่วงเวลาทับซ้อนกับการจอง "${b.topic}" ของ ${b.requesterName || 'ผู้ใช้งานอื่น'}`
+        };
+      }
+    }
+
+    // 3. ป้องกันปัญหา ID ซ้ำกัน (ID Collision) กรณีมีผู้ส่งคำขอพร้อมกัน
+    let finalId = bookingData.id;
+    if (!finalId) {
+      const existingIds = new Set(freshBookings.map((b) => b.id));
+      let maxNum = 0;
+      for (const b of freshBookings) {
+        if (b.id?.startsWith('MR-')) {
+          const n = parseInt(b.id.replace('MR-', ''), 10);
+          if (!isNaN(n) && n > maxNum) maxNum = n;
+        }
+      }
+      let nextNum = maxNum + 1;
+      finalId = `MR-${String(nextNum).padStart(5, '0')}`;
+      while (existingIds.has(finalId)) {
+        nextNum++;
+        finalId = `MR-${String(nextNum).padStart(5, '0')}`;
+      }
+    }
+
+    const finalBooking: Booking = {
+      ...bookingData,
+      id: finalId
+    } as Booking;
+
+    // 4. บันทึกลง Firestore
+    await setDoc(doc(db, BOOKINGS_COL, finalId), finalBooking, { merge: true });
+
+    return {
+      success: true,
+      booking: finalBooking,
+      allFreshBookings: [finalBooking, ...freshBookings.filter((b) => b.id !== finalId)]
+    };
+  } catch (err: any) {
+    console.error('Error in saveBookingWithConcurrencyCheck:', err);
+    return {
+      success: false,
+      error: err?.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล กรุณาลองใหม่อีกครั้ง'
+    };
+  }
+}
+
 // Rooms
 export async function saveRoomToFirestore(room: Room) {
-  await setDoc(doc(db, ROOMS_COL, room.id), room);
+  await setDoc(doc(db, ROOMS_COL, room.id), room, { merge: true });
 }
 
 export async function updateRoomInFirestore(roomId: string, updates: Partial<Room>) {
-  await updateDoc(doc(db, ROOMS_COL, roomId), updates);
+  await setDoc(doc(db, ROOMS_COL, roomId), updates, { merge: true });
 }
 
 export async function deleteRoomFromFirestore(roomId: string) {
@@ -160,11 +262,11 @@ export async function deleteRoomFromFirestore(roomId: string) {
 // Users
 export async function saveUserToFirestore(user: UserAccount) {
   const id = user.id || user.username;
-  await setDoc(doc(db, USERS_COL, id), { ...user, id });
+  await setDoc(doc(db, USERS_COL, id), { ...user, id }, { merge: true });
 }
 
 export async function updateUserInFirestore(userId: string, updates: Partial<UserAccount>) {
-  await updateDoc(doc(db, USERS_COL, userId), updates);
+  await setDoc(doc(db, USERS_COL, userId), updates, { merge: true });
 }
 
 export async function deleteUserFromFirestore(userId: string) {
@@ -173,11 +275,11 @@ export async function deleteUserFromFirestore(userId: string) {
 
 // Departments
 export async function saveDepartmentToFirestore(dept: Department) {
-  await setDoc(doc(db, DEPTS_COL, dept.id), dept);
+  await setDoc(doc(db, DEPTS_COL, dept.id), dept, { merge: true });
 }
 
 export async function updateDepartmentInFirestore(deptId: string, updates: Partial<Department>) {
-  await updateDoc(doc(db, DEPTS_COL, deptId), updates);
+  await setDoc(doc(db, DEPTS_COL, deptId), updates, { merge: true });
 }
 
 export async function deleteDepartmentFromFirestore(deptId: string) {

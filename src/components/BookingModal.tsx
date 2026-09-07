@@ -13,10 +13,19 @@ import {
   LayoutGrid,
   Wrench,
   Check,
-  Plus
+  Plus,
+  Info,
+  Loader2
 } from 'lucide-react';
 import { Room, Booking, UserAccount } from '../types';
-import { SELECTABLE_TIMES, formatFullThaiDate } from '../utils/thaiDate';
+import {
+  SELECTABLE_TIMES,
+  formatFullThaiDate,
+  formatThaiDate,
+  formatThaiTime,
+  checkBookingOverlap,
+  checkAdjacentBookings
+} from '../utils/thaiDate';
 import { DEFAULT_BOOKING_EQUIPMENT, normalizeEquipmentName, normalizeSeatingName } from '../data/initialData';
 
 interface BookingModalProps {
@@ -28,6 +37,8 @@ interface BookingModalProps {
   initialTime?: string | null;
   bookingData?: Booking | null;
   currentUser: UserAccount | null;
+  bookings?: Booking[];
+  isSubmitting?: boolean;
 }
 
 export const BookingModal: React.FC<BookingModalProps> = ({
@@ -38,7 +49,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   initialDate,
   initialTime,
   bookingData,
-  currentUser
+  currentUser,
+  bookings = [],
+  isSubmitting = false
 }) => {
   if (!isOpen) return null;
 
@@ -95,6 +108,63 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const [startDateStr, setStartDateStr] = useState('');
   const [endDateStr, setEndDateStr] = useState('');
 
+  const isTimeSlotInPast = (timeStr: string, dateStr: string) => {
+    if (bookingData) return false;
+    if (!dateStr || dateStr > todayIso) return false;
+    if (dateStr < todayIso) return true;
+    const [h, m] = timeStr.split(':').map(Number);
+    const slotD = new Date();
+    slotD.setHours(h, m, 0, 0);
+    const grace = new Date(Date.now() - 60 * 1000);
+    return slotD < grace;
+  };
+
+  const getFirstUpcomingTime = (dateStr: string, fallbackTime = '09:00'): string => {
+    if (dateStr !== todayIso || bookingData) return fallbackTime;
+    const upcoming = SELECTABLE_TIMES.find((t) => !isTimeSlotInPast(t, dateStr));
+    return upcoming || fallbackTime;
+  };
+
+  // Real-time Overlap and Adjacent Booking Detection
+  const { overlapConflict, adjacentInfo } = useMemo(() => {
+    if (!room || !startDateStr || !endDateStr || !bookings || bookings.length === 0) {
+      return { overlapConflict: null, adjacentInfo: null };
+    }
+
+    const [sH, sM] = startTime.split(':').map(Number);
+    const [eH, eM] = endTime.split(':').map(Number);
+    const sDate = new Date(startDateStr);
+    sDate.setHours(sH, sM, 0, 0);
+    const eDate = new Date(endDateStr);
+    eDate.setHours(eH, eM, 0, 0);
+
+    if (eDate <= sDate) {
+      return { overlapConflict: null, adjacentInfo: null };
+    }
+
+    const overlapRes = checkBookingOverlap(
+      bookings,
+      room.id,
+      sDate,
+      eDate,
+      bookingData ? bookingData.id : null
+    );
+
+    const adjRes = checkAdjacentBookings(
+      bookings,
+      room.id,
+      sDate,
+      eDate,
+      bookingData ? bookingData.id : null,
+      15
+    );
+
+    return {
+      overlapConflict: overlapRes.overlap ? overlapRes.conflictWith : null,
+      adjacentInfo: adjRes
+    };
+  }, [room, startDateStr, endDateStr, startTime, endTime, bookings, bookingData]);
+
   const refTopic = useRef<HTMLInputElement>(null);
   const refParticipants = useRef<HTMLInputElement>(null);
 
@@ -148,18 +218,20 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       setStartDateStr(defaultDateStr);
       setEndDateStr(defaultDateStr);
 
-      if (initialTime) {
-        setStartTime(initialTime);
-        const [h, m] = initialTime.split(':').map(Number);
-        const endD = new Date();
-        endD.setHours(h + 1, m, 0, 0);
-        setEndTime(
-          `${endD.getHours().toString().padStart(2, '0')}:${endD.getMinutes().toString().padStart(2, '0')}`
-        );
+      let chosenStart = '09:00';
+      if (initialTime && !isTimeSlotInPast(initialTime, defaultDateStr)) {
+        chosenStart = initialTime;
       } else {
-        setStartTime('09:00');
-        setEndTime('10:30');
+        chosenStart = getFirstUpcomingTime(defaultDateStr, '09:00');
       }
+
+      setStartTime(chosenStart);
+      const [h, m] = chosenStart.split(':').map(Number);
+      const endD = new Date();
+      endD.setHours(h + 1, m, 0, 0);
+      const computedEnd = `${endD.getHours().toString().padStart(2, '0')}:${endD.getMinutes().toString().padStart(2, '0')}`;
+      const validEnd = SELECTABLE_TIMES.find((t) => t > chosenStart) || computedEnd;
+      setEndTime(validEnd);
 
       setTopic('');
       setParticipants('');
@@ -203,17 +275,31 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       return;
     }
 
-    const startD = new Date(startDateStr);
-    startD.setHours(0, 0, 0, 0);
-    const todayD = new Date();
-    todayD.setHours(0, 0, 0, 0);
-    if (startD < todayD && !bookingData) {
-      setWarningMessage('ไม่สามารถจองห้องประชุมย้อนหลังได้ กรุณาเลือกวันที่ปัจจุบันหรือล่วงหน้า');
+    const [sH, sM] = startTime.split(':').map(Number);
+    const [eH, eM] = endTime.split(':').map(Number);
+
+    const bookingStart = new Date(startDateStr);
+    bookingStart.setHours(sH, sM, 0, 0);
+
+    const bookingEnd = new Date(endDateStr);
+    bookingEnd.setHours(eH, eM, 0, 0);
+
+    const nowCheck = new Date();
+    const gracePeriod = new Date(nowCheck.getTime() - 60 * 1000);
+
+    if (!bookingData && bookingStart < gracePeriod) {
+      setWarningMessage('ไม่สามารถจองห้องประชุมย้อนหลังได้ กรุณาเลือกช่วงเวลาและวันที่เป็นปัจจุบันหรือล่วงหน้า');
       return;
     }
 
-    if (new Date(endDateStr) < new Date(startDateStr)) {
-      setWarningMessage('วันที่สิ้นสุดต้องไม่เกิดขึ้นก่อนวันที่เริ่มต้น');
+    if (bookingEnd <= bookingStart) {
+      setWarningMessage('วันและเวลาสิ้นสุดต้องเกิดขึ้นหลังจากเวลาเริ่มต้น');
+      return;
+    }
+    if (overlapConflict) {
+      setWarningMessage(
+        `ไม่สามารถจองได้ เนื่องจากเวลาทับซ้อนกับการจอง "${overlapConflict.topic}" ของ ${overlapConflict.requesterName || 'ผู้ใช้งานอื่น'} (${formatThaiTime(overlapConflict.startTime)} - ${formatThaiTime(overlapConflict.endTime)} น.)`
+      );
       return;
     }
     if (!topic.trim()) {
@@ -356,6 +442,12 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     setStartDateStr(newStart);
                     if (!endDateStr || new Date(newStart) > new Date(endDateStr)) {
                       setEndDateStr(newStart);
+                    }
+                    if (isTimeSlotInPast(startTime, newStart)) {
+                      const nextValid = getFirstUpcomingTime(newStart, '09:00');
+                      setStartTime(nextValid);
+                      const validEnd = SELECTABLE_TIMES.find((t) => t > nextValid) || '10:30';
+                      setEndTime(validEnd);
                     }
                   }}
                   className="w-full p-2.5 bg-white border border-gray-300 rounded-xl text-xs sm:text-sm font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-[#C8102E]"
@@ -514,14 +606,29 @@ export const BookingModal: React.FC<BookingModalProps> = ({
               </label>
               <select
                 value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
+                onChange={(e) => {
+                  const newStart = e.target.value;
+                  setStartTime(newStart);
+                  if (startDateStr === endDateStr && endTime <= newStart) {
+                    const validEnd = SELECTABLE_TIMES.find((t) => t > newStart);
+                    if (validEnd) setEndTime(validEnd);
+                  }
+                }}
                 className="w-full p-2.5 bg-white border border-gray-300 rounded-xl text-xs sm:text-sm font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-[#C8102E]"
               >
-                {SELECTABLE_TIMES.map((t) => (
-                  <option key={`start-${t}`} value={t}>
-                    {t} น.
-                  </option>
-                ))}
+                {SELECTABLE_TIMES.map((t) => {
+                  const isPast = isTimeSlotInPast(t, startDateStr);
+                  return (
+                    <option
+                      key={`start-${t}`}
+                      value={t}
+                      disabled={isPast}
+                      className={isPast ? 'text-gray-400 bg-gray-100' : ''}
+                    >
+                      {t} น. {isPast ? '(ผ่านไปแล้ว)' : ''}
+                    </option>
+                  );
+                })}
               </select>
             </div>
             <div>
@@ -533,11 +640,19 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                 onChange={(e) => setEndTime(e.target.value)}
                 className="w-full p-2.5 bg-white border border-gray-300 rounded-xl text-xs sm:text-sm font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-[#C8102E]"
               >
-                {SELECTABLE_TIMES.map((t) => (
-                  <option key={`end-${t}`} value={t}>
-                    {t} น.
-                  </option>
-                ))}
+                {SELECTABLE_TIMES.map((t) => {
+                  const isInvalidEnd = startDateStr === endDateStr && t <= startTime;
+                  return (
+                    <option
+                      key={`end-${t}`}
+                      value={t}
+                      disabled={isInvalidEnd}
+                      className={isInvalidEnd ? 'text-gray-400 bg-gray-100' : ''}
+                    >
+                      {t} น. {isInvalidEnd ? '(ก่อนหรือเท่ากับเวลาเริ่ม)' : ''}
+                    </option>
+                  );
+                })}
               </select>
             </div>
             <div>
@@ -564,11 +679,13 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           {/* Catering: Snacks, Lunch, Drinks (Keyboard-typeable) */}
           <div>
             <label className="block text-xs sm:text-sm font-bold text-gray-700 mb-1.5">
-              อาหารและเครื่องดื่ม (สามารถพิมพ์ระบุจำนวนที่ต้องการจากแป้นพิมพ์)
+              อาหารและเครื่องดื่ม
             </label>
-            <div className="grid grid-cols-3 gap-2 sm:gap-3">
-              <div>
-                <span className="text-xs text-gray-600 font-semibold block mb-1">อาหารว่าง (ชุด)</span>
+            <div className="grid grid-cols-3 gap-2 sm:gap-3 items-end">
+              <div className="flex flex-col justify-end">
+                <span className="text-[11px] sm:text-xs text-gray-600 font-semibold block mb-1 min-h-[36px] sm:min-h-[22px] flex items-end leading-tight sm:whitespace-nowrap">
+                  อาหารว่าง (ชุด)
+                </span>
                 <input
                   type="text"
                   inputMode="numeric"
@@ -582,8 +699,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   className="w-full p-2.5 bg-white border border-gray-300 rounded-xl text-xs sm:text-sm font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-[#C8102E]"
                 />
               </div>
-              <div>
-                <span className="text-xs text-gray-600 font-semibold block mb-1">อาหารกลางวัน (กล่อง)</span>
+              <div className="flex flex-col justify-end">
+                <span className="text-[11px] sm:text-xs text-gray-600 font-semibold block mb-1 min-h-[36px] sm:min-h-[22px] flex items-end leading-tight sm:whitespace-nowrap">
+                  อาหารกลางวัน (กล่อง)
+                </span>
                 <input
                   type="text"
                   inputMode="numeric"
@@ -597,8 +716,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   className="w-full p-2.5 bg-white border border-gray-300 rounded-xl text-xs sm:text-sm font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-[#C8102E]"
                 />
               </div>
-              <div>
-                <span className="text-xs text-gray-600 font-semibold block mb-1">เครื่องดื่ม (ขวด)</span>
+              <div className="flex flex-col justify-end">
+                <span className="text-[11px] sm:text-xs text-gray-600 font-semibold block mb-1 min-h-[36px] sm:min-h-[22px] flex items-end leading-tight sm:whitespace-nowrap">
+                  เครื่องดื่ม (ขวด)
+                </span>
                 <input
                   type="text"
                   inputMode="numeric"
@@ -809,20 +930,89 @@ export const BookingModal: React.FC<BookingModalProps> = ({
             />
           </div>
 
+          {/* Real-time Overlap Conflict Banner */}
+          {overlapConflict && (
+            <div className="p-3.5 sm:p-4 bg-red-50 border-2 border-red-300 rounded-2xl flex items-start gap-3 shadow-xs">
+              <AlertTriangle className="text-red-600 shrink-0 mt-0.5" size={20} />
+              <div className="text-xs sm:text-sm text-red-900 space-y-1">
+                <p className="font-bold text-red-700 text-sm">
+                  ⚠️ เวลาทับซ้อนกับการจองอื่นในระบบ (ไม่สามารถจองช่วงเวลานี้ได้)
+                </p>
+                <p className="text-xs text-red-800">
+                  หัวข้อการประชุม: <span className="font-semibold text-gray-900">"{overlapConflict.topic}"</span>
+                </p>
+                <p className="text-xs text-red-800">
+                  ผู้ขอจอง: <span className="font-semibold text-gray-900">{overlapConflict.requesterName || 'ไม่ระบุชื่อ'}</span> ({overlapConflict.department})
+                </p>
+                <p className="text-xs text-red-800">
+                  ช่วงเวลาที่ถูกจองแล้ว: <span className="font-semibold text-[#C8102E]">{formatThaiDate(new Date(overlapConflict.startTime))} เวลา {formatThaiTime(overlapConflict.startTime)} - {formatThaiTime(overlapConflict.endTime)} น.</span>
+                </p>
+                <p className="text-[11px] text-red-600 pt-0.5 font-medium">
+                  💡 กรุณาเลือกช่วงเวลาใหม่ หรือตรวจสอบตารางเวลาการใช้งานห้องประชุม
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Adjacent / Back-to-Back Booking Notice */}
+          {!overlapConflict && adjacentInfo && (adjacentInfo.hasAdjacentBefore || adjacentInfo.hasAdjacentAfter) && (
+            <div className="p-3 sm:p-3.5 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-2.5">
+              <Info className="text-amber-600 shrink-0 mt-0.5" size={18} />
+              <div className="text-xs text-amber-900 space-y-0.5">
+                <p className="font-bold text-amber-800">
+                  💡 มีการใช้งานห้องประชุมต่อเนื่องติดกัน
+                </p>
+                {adjacentInfo.hasAdjacentBefore && (
+                  <p>
+                    • ก่อนหน้า: การจอง "{adjacentInfo.beforeBooking?.topic}" สิ้นสุดเวลา <span className="font-semibold">{formatThaiTime(adjacentInfo.beforeBooking!.endTime)} น.</span>
+                  </p>
+                )}
+                {adjacentInfo.hasAdjacentAfter && (
+                  <p>
+                    • ถัดไป: การจอง "{adjacentInfo.afterBooking?.topic}" เริ่มเวลา <span className="font-semibold">{formatThaiTime(adjacentInfo.afterBooking!.startTime)} น.</span>
+                  </p>
+                )}
+                <p className="text-[11px] text-amber-700 pt-0.5">
+                  กรุณาเผื่อเวลาสำหรับจัดเตรียมอุปกรณ์และส่งมอบห้องประชุมตรงเวลา
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Submit Actions */}
           <div className="pt-3 flex gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-2xl transition text-sm"
+              disabled={isSubmitting}
+              className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 disabled:opacity-60 text-gray-700 font-bold rounded-2xl transition text-sm"
             >
               ยกเลิก
             </button>
             <button
               type="submit"
-              className="flex-2 py-3 bg-[#C8102E] hover:bg-[#a00c24] text-white font-bold rounded-2xl transition text-sm shadow-md active:scale-95 flex items-center justify-center gap-2"
+              disabled={Boolean(overlapConflict) || isSubmitting}
+              className={`flex-2 py-3 font-bold rounded-2xl transition text-sm shadow-md flex items-center justify-center gap-2 ${
+                overlapConflict
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : isSubmitting
+                  ? 'bg-[#C8102E]/80 text-white cursor-wait'
+                  : 'bg-[#C8102E] hover:bg-[#a00c24] text-white active:scale-95'
+              }`}
             >
-              <span>{bookingData ? 'บันทึกการแก้ไข' : 'ส่งคำขอจองห้องประชุม'}</span>
+              {isSubmitting ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  <span>กำลังตรวจสอบคิวว่างกับฐานข้อมูล...</span>
+                </>
+              ) : overlapConflict ? (
+                <>
+                  <AlertTriangle size={16} />
+                  <span>ไม่สามารถจองได้ (เวลาซ้อนทับ)</span>
+                </>
+              ) : (
+                <span>{bookingData ? 'บันทึกการแก้ไข' : 'ส่งคำขอจองห้องประชุม'}</span>
+              )}
             </button>
           </div>
         </form>

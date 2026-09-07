@@ -43,7 +43,9 @@ interface NotificationCenterModalProps {
   users: UserAccount[];
   emailNotifications: EmailNotification[];
   readNotificationIds?: string[];
+  deletedNotificationIds?: string[];
   onMarkNotificationsRead?: (ids: string[]) => void;
+  onDeleteNotifications?: (ids: string[]) => void;
   onOpenBooking: (bookingId: string) => void;
   onClearEmailNotifications: () => void;
   onOpenManagement?: () => void;
@@ -58,7 +60,9 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
   users,
   emailNotifications,
   readNotificationIds = [],
+  deletedNotificationIds = [],
   onMarkNotificationsRead,
+  onDeleteNotifications,
   onOpenBooking,
   onClearEmailNotifications,
   onOpenManagement,
@@ -68,6 +72,8 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
   const [filterType, setFilterType] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [localReadIds, setLocalReadIds] = useState<Set<string>>(() => new Set());
+  const [localDeletedIds, setLocalDeletedIds] = useState<Set<string>>(() => new Set());
+  const [showConfirmDeleteAll, setShowConfirmDeleteAll] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState<EmailNotification | null>(
     emailNotifications.length > 0 ? emailNotifications[0] : null
   );
@@ -77,6 +83,12 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
     localReadIds.forEach((id) => combined.add(id));
     return combined;
   }, [readNotificationIds, localReadIds]);
+
+  const deletedIdsSet = useMemo(() => {
+    const combined = new Set(deletedNotificationIds);
+    localDeletedIds.forEach((id) => combined.add(id));
+    return combined;
+  }, [deletedNotificationIds, localDeletedIds]);
 
   // Build unified notifications list
   const notifications: AppNotification[] = useMemo(() => {
@@ -167,9 +179,11 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
       }
     });
 
-    // Sort newest first
-    return list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  }, [bookings, users, emailNotifications, currentUser, readIdsSet]);
+    // Filter out deleted notifications and sort newest first
+    return list
+      .filter((item) => !deletedIdsSet.has(item.id))
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [bookings, users, emailNotifications, currentUser, readIdsSet, deletedIdsSet]);
 
   // Auto mark all visible notifications as read on opening
   useEffect(() => {
@@ -230,6 +244,22 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
     }
   };
 
+  const handleDeleteSingle = (id: string) => {
+    setLocalDeletedIds((prev) => new Set([...prev, id]));
+    if (onDeleteNotifications) {
+      onDeleteNotifications([id]);
+    }
+  };
+
+  const handleConfirmDeleteAll = () => {
+    const allIds = notifications.map((n) => n.id);
+    setLocalDeletedIds((prev) => new Set([...prev, ...allIds]));
+    if (onDeleteNotifications) {
+      onDeleteNotifications(allIds);
+    }
+    setShowConfirmDeleteAll(false);
+  };
+
   const handleItemClick = (n: AppNotification) => {
     setLocalReadIds((prev) => new Set([...prev, n.id]));
     if (onMarkNotificationsRead) {
@@ -277,7 +307,7 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-end sm:self-auto">
+          <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap justify-end">
             {unreadCount > 0 && (
               <button
                 type="button"
@@ -288,6 +318,38 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
                 <CheckCheck size={14} className="text-blue-600" />
                 <span>อ่านทั้งหมดแล้ว</span>
               </button>
+            )}
+            {notifications.length > 0 && (
+              showConfirmDeleteAll ? (
+                <div className="flex items-center gap-1 bg-red-50 p-0.5 rounded-xl border border-red-200 animate-fade-in">
+                  <button
+                    type="button"
+                    onClick={handleConfirmDeleteAll}
+                    className="flex items-center gap-1 text-xs font-bold text-white bg-red-600 hover:bg-red-700 px-2.5 py-1 rounded-lg transition shadow-2xs"
+                    title="ยืนยันการลบข้อความแจ้งเตือนทั้งหมด"
+                  >
+                    <Trash2 size={12} />
+                    <span>ยืนยันลบทั้งหมด</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmDeleteAll(false)}
+                    className="text-xs font-semibold text-gray-500 hover:text-gray-800 px-2 py-1 rounded-lg transition"
+                  >
+                    ยกเลิก
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmDeleteAll(true)}
+                  className="flex items-center gap-1 text-xs font-bold text-gray-600 hover:text-red-600 px-3 py-1.5 rounded-xl border border-gray-200 bg-white hover:bg-red-50/70 transition shadow-2xs"
+                  title="ลบข้อความการแจ้งเตือนทั้งหมด"
+                >
+                  <Trash2 size={14} className="text-red-500" />
+                  <span>ลบข้อความทั้งหมด</span>
+                </button>
+              )
             )}
             <button
               type="button"
@@ -441,19 +503,33 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
                         </div>
                       </div>
 
-                      {item.bookingId && (
+                      <div className="flex items-center gap-1.5 shrink-0 self-center sm:self-auto">
+                        {item.bookingId && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleItemClick(item);
+                            }}
+                            className="flex items-center gap-1 text-[11px] font-bold text-[#C8102E] bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-xl border border-red-200 transition shrink-0"
+                            title="เปิดดูรายละเอียดการจอง"
+                          >
+                            <span>เปิดดู</span>
+                            <ExternalLink size={12} />
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleItemClick(item);
+                            handleDeleteSingle(item.id);
                           }}
-                          className="flex items-center gap-1 text-[11px] font-bold text-[#C8102E] bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-xl border border-red-200 transition shrink-0 self-center sm:self-auto"
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl border border-transparent hover:border-red-200 transition shrink-0"
+                          title="ลบข้อความแจ้งเตือนนี้"
                         >
-                          <span>เปิดดู</span>
-                          <ExternalLink size={12} />
+                          <Trash2 size={15} />
                         </button>
-                      )}
+                      </div>
                     </div>
                   );
                 })

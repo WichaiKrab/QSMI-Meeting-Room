@@ -187,3 +187,60 @@ export const checkBookingOverlap = (
   }
   return { overlap: false, conflictWith: null };
 };
+
+export interface AdjacentBookingsResult {
+  hasAdjacentBefore: boolean;
+  beforeBooking: Booking | null;
+  hasAdjacentAfter: boolean;
+  afterBooking: Booking | null;
+}
+
+/**
+ * ตรวจสอบการจองที่มีเวลาต่อเนื่องติดกันหรือใกล้เคียงกันมาก (เช่น ภายใน 15 นาที หรือติดกันพอดี)
+ */
+export const checkAdjacentBookings = (
+  bookings: Booking[],
+  roomId: string,
+  start: Date,
+  end: Date,
+  excludeId: string | null = null,
+  bufferMinutes: number = 15
+): AdjacentBookingsResult => {
+  const nStart = start.getTime();
+  const nEnd = end.getTime();
+  const bufferMs = bufferMinutes * 60 * 1000;
+
+  let beforeBooking: Booking | null = null;
+  let afterBooking: Booking | null = null;
+
+  for (const b of bookings) {
+    if (excludeId && b.id === excludeId) continue;
+    if (b.roomId !== roomId) continue;
+    if (b.status === 'rejected' || b.status === 'cancelled') continue;
+
+    const bStart = new Date(b.startTime).getTime();
+    const bEnd = new Date(b.endTime).getTime();
+
+    // Directly adjacent or within bufferMinutes before (ends at or shortly before start)
+    if (bEnd <= nStart && nStart - bEnd <= bufferMs) {
+      if (!beforeBooking || bEnd > new Date(beforeBooking.endTime).getTime()) {
+        beforeBooking = b;
+      }
+    }
+
+    // Directly adjacent or within bufferMinutes after (starts at or shortly after end)
+    if (bStart >= nEnd && bStart - nEnd <= bufferMs) {
+      if (!afterBooking || bStart < new Date(afterBooking.startTime).getTime()) {
+        afterBooking = b;
+      }
+    }
+  }
+
+  return {
+    hasAdjacentBefore: beforeBooking !== null,
+    beforeBooking,
+    hasAdjacentAfter: afterBooking !== null,
+    afterBooking
+  };
+};
+

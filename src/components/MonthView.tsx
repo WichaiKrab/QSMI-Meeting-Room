@@ -243,16 +243,49 @@ export const MonthView: React.FC<MonthViewProps> = ({
                 <ChevronRight size={14} className="shrink-0" />
               </button>
             ) : (
-              targetRoom && targetRoom.isActive && (
-                <button
-                  type="button"
-                  onClick={() => onSlotClick(targetRoom, '09:00', selectedCellDate)}
-                  className="text-xs sm:text-sm flex items-center gap-1 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl font-bold bg-[#C8102E] hover:bg-[#a00c24] shadow-xs transition whitespace-nowrap shrink-0"
-                >
-                  <Plus size={14} className="shrink-0" />
-                  <span>จองวันนี้</span>
-                </button>
-              )
+              targetRoom && targetRoom.isActive && (() => {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const cell = new Date(selectedCellDate);
+                cell.setHours(0, 0, 0, 0);
+                const isPastCellDay = cell < today;
+
+                return (
+                  <button
+                    type="button"
+                    disabled={isPastCellDay}
+                    onClick={() => {
+                      if (isPastCellDay) return;
+                      const now = new Date();
+                      const isToday =
+                        selectedCellDate.getDate() === now.getDate() &&
+                        selectedCellDate.getMonth() === now.getMonth() &&
+                        selectedCellDate.getFullYear() === now.getFullYear();
+
+                      let chosenTime = '09:00';
+                      if (isToday) {
+                        const curH = now.getHours();
+                        const curM = now.getMinutes();
+                        if (curH >= 9) {
+                          const nextH = curM >= 30 ? curH + 1 : curH;
+                          const nextM = curM >= 30 ? '00' : '30';
+                          chosenTime = `${String(nextH).padStart(2, '0')}:${nextM}`;
+                        }
+                      }
+                      onSlotClick(targetRoom, chosenTime, selectedCellDate);
+                    }}
+                    className={`text-xs sm:text-sm flex items-center gap-1 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl font-bold transition whitespace-nowrap shrink-0 ${
+                      isPastCellDay
+                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        : 'text-white bg-[#C8102E] hover:bg-[#a00c24] shadow-xs cursor-pointer'
+                    }`}
+                    title={isPastCellDay ? 'ไม่สามารถจองย้อนหลังได้' : 'จองห้องนี้ในวันที่เลือก'}
+                  >
+                    <Plus size={14} className="shrink-0" />
+                    <span>{isPastCellDay ? 'วันที่ผ่านมาแล้ว' : 'จองวันนี้'}</span>
+                  </button>
+                );
+              })()
             )}
           </div>
         </div>

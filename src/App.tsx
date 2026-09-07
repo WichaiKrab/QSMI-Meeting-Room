@@ -17,7 +17,7 @@ import {
   normalizeEquipmentName
 } from './data/initialData';
 import { createEmailNotifications } from './utils/emailService';
-import { checkBookingOverlap, formatThaiDate, formatThaiTime } from './utils/thaiDate';
+import { checkBookingOverlap, formatThaiDate, formatThaiTime, SELECTABLE_TIMES } from './utils/thaiDate';
 import {
   initializeFirestoreDefaults,
   subscribeToRooms,
@@ -36,7 +36,8 @@ import {
   deleteUserFromFirestore,
   saveDepartmentToFirestore,
   updateDepartmentInFirestore,
-  deleteDepartmentFromFirestore
+  deleteDepartmentFromFirestore,
+  saveBookingWithConcurrencyCheck
 } from './lib/firestoreService';
 
 // Components
@@ -193,6 +194,7 @@ export default function App() {
 
   // Modal open states
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isMyBookingsOpen, setIsMyBookingsOpen] = useState(false);
   const [isManagerPortalOpen, setIsManagerPortalOpen] = useState(false);
@@ -417,17 +419,38 @@ export default function App() {
     }
   });
 
-  // Sync readNotificationIds on currentUser change
+  // Persistent deleted notifications tracking per username
+  const [deletedNotificationIds, setDeletedNotificationIds] = useState<string[]>(() => {
+    try {
+      const savedUser = localStorage.getItem('meeting_app_sso_user');
+      if (savedUser) {
+        const u = JSON.parse(savedUser);
+        if (u?.username) {
+          const saved = localStorage.getItem(`meeting_app_deleted_notifs_${u.username.toLowerCase()}`);
+          return saved ? JSON.parse(saved) : [];
+        }
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Sync readNotificationIds and deletedNotificationIds on currentUser change
   useEffect(() => {
     if (currentUser?.username) {
       try {
-        const saved = localStorage.getItem(`meeting_app_read_notifs_${currentUser.username.toLowerCase()}`);
-        setReadNotificationIds(saved ? JSON.parse(saved) : []);
+        const savedRead = localStorage.getItem(`meeting_app_read_notifs_${currentUser.username.toLowerCase()}`);
+        setReadNotificationIds(savedRead ? JSON.parse(savedRead) : []);
+        const savedDeleted = localStorage.getItem(`meeting_app_deleted_notifs_${currentUser.username.toLowerCase()}`);
+        setDeletedNotificationIds(savedDeleted ? JSON.parse(savedDeleted) : []);
       } catch {
         setReadNotificationIds([]);
+        setDeletedNotificationIds([]);
       }
     } else {
       setReadNotificationIds([]);
+      setDeletedNotificationIds([]);
     }
   }, [currentUser?.username]);
 
@@ -444,22 +467,43 @@ export default function App() {
     });
   };
 
+  const handleDeleteNotifications = (idsToDelete: string[]) => {
+    if (!currentUser?.username || idsToDelete.length === 0) return;
+    setDeletedNotificationIds((prev) => {
+      const combined = Array.from(new Set([...prev, ...idsToDelete]));
+      try {
+        localStorage.setItem(`meeting_app_deleted_notifs_${currentUser.username.toLowerCase()}`, JSON.stringify(combined));
+      } catch (e) {
+        console.error('Error saving deleted notifications', e);
+      }
+      return combined;
+    });
+    showToast(
+      idsToDelete.length > 1
+        ? `ลบข้อความแจ้งเตือนทั้งหมดเรียบร้อยแล้ว`
+        : `ลบข้อความแจ้งเตือนเรียบร้อยแล้ว`,
+      'info'
+    );
+  };
+
   // Pending user registrations count (for Admin badge)
   const pendingUsers = useMemo(() => {
     return users.filter((u) => u.status === 'pending');
   }, [users]);
 
-  // Total notification count for header badge (counting only unread notifications)
+  // Total notification count for header badge (counting only unread & non-deleted notifications)
   const totalNotificationsCount = useMemo(() => {
     if (!currentUser) return 0;
     const readSet = new Set(readNotificationIds);
+    const deletedSet = new Set(deletedNotificationIds);
     let count = 0;
 
     // 1. Pending member registrations (for Admin & Manager)
     if (currentUser.role === 'admin' || currentUser.role === 'manager') {
       const pendingUsersList = users.filter((u) => u.status === 'pending');
       pendingUsersList.forEach((u) => {
-        if (!readSet.has(`user_pending_${u.username}`)) {
+        const id = `user_pending_${u.username}`;
+        if (!deletedSet.has(id) && !readSet.has(id)) {
           count++;
         }
       });
@@ -475,30 +519,36 @@ export default function App() {
 
       if (!isAdmin && !isMine) return;
 
+      const checkAndIncrement = (id: string) => {
+        if (!deletedSet.has(id) && !readSet.has(id)) count++;
+      };
+
       if (b.status === 'pending') {
-        if (!readSet.has(`booking_pending_${b.id}`)) count++;
+        checkAndIncrement(`booking_pending_${b.id}`);
       } else if (b.status === 'approved') {
-        if (!readSet.has(`booking_approved_${b.id}`)) count++;
+        checkAndIncrement(`booking_approved_${b.id}`);
       } else if (b.status === 'rejected') {
-        if (!readSet.has(`booking_rejected_${b.id}`)) count++;
+        checkAndIncrement(`booking_rejected_${b.id}`);
       } else if (b.status === 'cancelled') {
-        if (!readSet.has(`booking_cancelled_${b.id}`)) count++;
+        checkAndIncrement(`booking_cancelled_${b.id}`);
       }
     });
 
     return count;
-  }, [currentUser, users, bookings, readNotificationIds]);
+  }, [currentUser, users, bookings, readNotificationIds, deletedNotificationIds]);
 
   // --- Handlers ---
   const handleOpenSlot = (room: Room, time: string, customDate?: Date) => {
     const targetDate = customDate || currentDate;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const checkDate = new Date(targetDate);
-    checkDate.setHours(0, 0, 0, 0);
+    const [h, m] = time.split(':').map(Number);
+    const slotDateTime = new Date(targetDate);
+    slotDateTime.setHours(h, m, 0, 0);
 
-    if (checkDate < today) {
-      showToast('ไม่สามารถจองห้องประชุมในวันที่ย้อนหลังได้ กรุณาเลือกวันที่ปัจจุบันหรือในอนาคต', 'error');
+    const now = new Date();
+    const graceTime = new Date(now.getTime() - 60 * 1000);
+
+    if (slotDateTime < graceTime) {
+      showToast('ไม่สามารถจองห้องประชุมย้อนหลังได้ กรุณาเลือกช่วงเวลาปัจจุบันหรือล่วงหน้า', 'error');
       return;
     }
 
@@ -519,6 +569,7 @@ export default function App() {
   };
 
   const handleQuickBook = () => {
+    const now = new Date();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const checkDate = new Date(currentDate);
@@ -529,7 +580,23 @@ export default function App() {
     }
 
     const defaultRoom = rooms[0];
-    const defaultTime = '09:00';
+    let defaultTime = '09:00';
+
+    const isToday =
+      targetDate.getFullYear() === now.getFullYear() &&
+      targetDate.getMonth() === now.getMonth() &&
+      targetDate.getDate() === now.getDate();
+
+    if (isToday) {
+      const upcoming = SELECTABLE_TIMES.find((t) => {
+        const [h, m] = t.split(':').map(Number);
+        const slotD = new Date();
+        slotD.setHours(h, m, 0, 0);
+        return slotD > new Date(Date.now() + 5 * 60 * 1000);
+      });
+      if (upcoming) defaultTime = upcoming;
+    }
+
     setSelectedSlotRoom(defaultRoom);
     setSelectedSlotTime(defaultTime);
     setEditingBooking(null);
@@ -545,7 +612,7 @@ export default function App() {
     setIsBookingModalOpen(true);
   };
 
-  const handleBookingSubmit = (formData: any) => {
+  const handleBookingSubmit = async (formData: any) => {
     const room = selectedSlotRoom || rooms.find((r) => r.id === editingBooking?.roomId);
     if (!room) {
       showToast('กรุณาเลือกห้องประชุม', 'error');
@@ -561,89 +628,158 @@ export default function App() {
     const endDateTime = new Date(formData.bookingEndDate);
     endDateTime.setHours(eH, eM, 0, 0);
 
+    const now = new Date();
+    const graceTime = new Date(now.getTime() - 60 * 1000);
+
+    if (!editingBooking && startDateTime < graceTime) {
+      showToast('ไม่สามารถจองห้องประชุมย้อนหลังได้ กรุณาเลือกช่วงเวลาและวันที่เป็นปัจจุบันหรือล่วงหน้า', 'error');
+      return;
+    }
+
     if (endDateTime <= startDateTime) {
       showToast('เวลาหรือวันที่สิ้นสุดต้องเกิดขึ้นหลังจากเวลาเริ่มต้น', 'error');
       return;
     }
 
-    // Overlap check
+    // 1. Initial Local Overlap check (Instant feedback)
     const excludeId = editingBooking ? editingBooking.id : null;
-    const overlapResult = checkBookingOverlap(bookings, room.id, startDateTime, endDateTime, excludeId);
-    if (overlapResult.overlap) {
+    const localOverlapResult = checkBookingOverlap(bookings, room.id, startDateTime, endDateTime, excludeId);
+    if (localOverlapResult.overlap) {
       showToast(
-        `ไม่สามารถจองได้ เนื่องจากเวลาทับซ้อนกับการจอง "${overlapResult.conflictWith?.topic}"`,
+        `ไม่สามารถจองได้ เนื่องจากเวลาทับซ้อนกับการจอง "${localOverlapResult.conflictWith?.topic}" (${formatThaiTime(localOverlapResult.conflictWith?.startTime || '')} - ${formatThaiTime(localOverlapResult.conflictWith?.endTime || '')} น.)`,
         'error'
       );
       return;
     }
 
-    if (editingBooking) {
-      // Update existing booking
-      const updated: Booking = {
-        ...editingBooking,
-        ...formData,
-        startTime: startDateTime.toISOString(),
-        endTime: endDateTime.toISOString(),
-        roomId: room.id
-      };
+    setIsSubmittingBooking(true);
 
-      setBookings((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
-      updateBookingInFirestore(updated.id, updated).catch(console.warn);
-      showToast('บันทึกการแก้ไขข้อมูลเรียบร้อยแล้ว', 'success');
-      setIsBookingModalOpen(false);
-      setEditingBooking(null);
-    } else {
-      // Create new booking
-      const nextNum =
-        bookings.reduce((max, b) => {
-          if (b.id.startsWith('MR-')) {
-            const n = parseInt(b.id.split('-')[1]);
-            return !isNaN(n) && n > max ? n : max;
+    try {
+      if (editingBooking) {
+        // Update existing booking with Server Concurrency & Fresh Overlap Verification
+        const updatedData: Booking = {
+          ...editingBooking,
+          ...formData,
+          startTime: startDateTime.toISOString(),
+          endTime: endDateTime.toISOString(),
+          roomId: room.id
+        };
+
+        const result = await saveBookingWithConcurrencyCheck(
+          updatedData,
+          room.id,
+          startDateTime,
+          endDateTime,
+          editingBooking.id
+        );
+
+        if (!result.success) {
+          if (result.conflictWith) {
+            showToast(
+              `⚠️ ไม่สามารถแก้ไขได้: ช่วงเวลาทับซ้อนกับการจอง "${result.conflictWith.topic}" ของ ${result.conflictWith.requesterName || 'ผู้ใช้อื่น'} (${formatThaiTime(result.conflictWith.startTime)} - ${formatThaiTime(result.conflictWith.endTime)} น.)`,
+              'error'
+            );
+            if (result.allFreshBookings) {
+              setBookings(result.allFreshBookings);
+            }
+          } else {
+            showToast(result.error || 'เกิดข้อผิดพลาดในการตรวจสอบข้อมูลกับฐานข้อมูล', 'error');
           }
-          return max;
-        }, 0) + 1;
+          return;
+        }
 
-      const newId = `MR-${String(nextNum).padStart(5, '0')}`;
+        const savedBooking = result.booking || updatedData;
+        setBookings((prev) => prev.map((b) => (b.id === savedBooking.id ? savedBooking : b)));
+        showToast('บันทึกการแก้ไขข้อมูลเรียบร้อยแล้ว', 'success');
+        setIsBookingModalOpen(false);
+        setEditingBooking(null);
+      } else {
+        // Create new booking with Server Concurrency Check & Collision-free ID
+        const newBookingData: Omit<Booking, 'id'> = {
+          roomId: room.id,
+          topic: formData.topic,
+          department: formData.department || currentUser?.department || 'ฝ่ายบริหารงานทั่วไป',
+          requesterName: formData.requesterName,
+          phone: formData.phone,
+          email: formData.email,
+          institute: formData.institute,
+          startTime: startDateTime.toISOString(),
+          endTime: endDateTime.toISOString(),
+          participants: formData.participants,
+          snacks: formData.snacks,
+          lunch: formData.lunch,
+          drinks: formData.drinks,
+          equipment: formData.equipment,
+          meetingType: formData.meetingType,
+          meetingLink: formData.meetingLink,
+          seatingSetup: formData.seatingSetup,
+          createdAt: new Date().toISOString(),
+          status: 'pending',
+          isBlocked: false
+        };
 
-      const newBooking: Booking = {
-        id: newId,
-        roomId: room.id,
-        topic: formData.topic,
-        department: formData.department || currentUser?.department || 'ฝ่ายบริหารงานทั่วไป',
-        requesterName: formData.requesterName,
-        phone: formData.phone,
-        email: formData.email,
-        institute: formData.institute,
-        startTime: startDateTime.toISOString(),
-        endTime: endDateTime.toISOString(),
-        participants: formData.participants,
-        snacks: formData.snacks,
-        lunch: formData.lunch,
-        drinks: formData.drinks,
-        equipment: formData.equipment,
-        meetingType: formData.meetingType,
-        meetingLink: formData.meetingLink,
-        seatingSetup: formData.seatingSetup,
-        createdAt: new Date().toISOString(),
-        status: 'pending',
-        isBlocked: false
-      };
+        const result = await saveBookingWithConcurrencyCheck(
+          newBookingData,
+          room.id,
+          startDateTime,
+          endDateTime,
+          null
+        );
 
-      setBookings((prev) => [newBooking, ...prev]);
-      saveBookingToFirestore(newBooking).catch(console.warn);
+        if (!result.success) {
+          // Race condition caught! Another user booked in this timeslot
+          if (result.conflictWith) {
+            showToast(
+              `⚠️ ไม่สามารถส่งคำขอได้: มีผู้ใช้งานท่านอื่น ("${result.conflictWith.requesterName || result.conflictWith.topic}") เพิ่งส่งคำขอจองห้องนี้ในช่วงเวลาดังกล่าว กรุณาเลือกช่วงเวลาอื่น`,
+              'error'
+            );
+            if (result.allFreshBookings) {
+              setBookings(result.allFreshBookings);
+            }
+          } else {
+            showToast(result.error || 'เกิดข้อผิดพลาดในการตรวจสอบคิวว่างกับฐานข้อมูล', 'error');
+          }
+          return;
+        }
 
-      // Trigger Email Notification (RECEIVED)
-      const newMails = createEmailNotifications(newBooking, 'RECEIVED', rooms);
-      setEmailNotifications((prev) => [...newMails, ...prev]);
+        const newBooking = result.booking!;
+        setBookings((prev) => [newBooking, ...prev.filter((b) => b.id !== newBooking.id)]);
 
-      showToast(`ส่งคำขอจองเรียบร้อย รหัส ${newId} (รอการอนุมัติและส่งอีเมลแจ้งเตือนแล้ว)`, 'success');
-      setIsBookingModalOpen(false);
-      setEditingBooking(null);
+        // Trigger Email Notification (RECEIVED)
+        const newMails = createEmailNotifications(newBooking, 'RECEIVED', rooms);
+        setEmailNotifications((prev) => [...newMails, ...prev]);
 
-      // Open detail modal to show summary & Google Calendar option
-      setViewingBooking(newBooking);
-      setIsDetailModalOpen(true);
+        showToast(`ส่งคำขอจองเรียบร้อย รหัส ${newBooking.id} (รอการอนุมัติและส่งอีเมลแจ้งเตือนแล้ว)`, 'success');
+        setIsBookingModalOpen(false);
+        setEditingBooking(null);
+
+        // Open detail modal to show summary & Google Calendar option
+        setViewingBooking(newBooking);
+        setIsDetailModalOpen(true);
+      }
+    } catch (err: any) {
+      console.error('Error submitting booking:', err);
+      showToast('เกิดข้อผิดพลาดในการส่งคำขอจอง กรุณาลองใหม่อีกครั้ง', 'error');
+    } finally {
+      setIsSubmittingBooking(false);
     }
+  };
+
+  const handleBatchImportBookings = async (newBookings: Booking[]) => {
+    if (!newBookings || newBookings.length === 0) return;
+
+    setBookings((prev) => [...newBookings, ...prev]);
+
+    for (const b of newBookings) {
+      saveBookingToFirestore(b).catch((err) =>
+        console.warn('Error saving imported booking to Firestore:', b.id, err)
+      );
+    }
+
+    showToast(
+      `นำเข้าข้อมูลรายการจองสำเร็จทั้งหมด ${newBookings.length} รายการ`,
+      'success'
+    );
   };
 
   const handleApprove = (idOrBooking: string | Booking) => {
@@ -824,14 +960,26 @@ export default function App() {
       hasSpecialSeating: newRoomData.hasSpecialSeating
     };
     setRooms((prev) => [...prev, newRoom]);
-    saveRoomToFirestore(newRoom).catch(console.warn);
-    showToast(`เพิ่มห้องประชุม "${newRoom.name}" เรียบร้อยแล้ว`, 'success');
+    saveRoomToFirestore(newRoom)
+      .then(() => {
+        showToast(`เพิ่มห้องประชุม "${newRoom.name}" เรียบร้อยแล้ว`, 'success');
+      })
+      .catch((err) => {
+        console.error('Error saving room to Firestore:', err);
+        showToast(`เพิ่มห้องประชุมในเครื่องแล้ว (คลาวด์: ${err?.message || 'ข้อผิดพลาดการเชื่อมต่อ'})`, 'error');
+      });
   };
 
   const handleUpdateRoom = (updatedRoom: Room) => {
     setRooms((prev) => prev.map((r) => (r.id === updatedRoom.id ? updatedRoom : r)));
-    updateRoomInFirestore(updatedRoom.id, updatedRoom).catch(console.warn);
-    showToast(`แก้ไขข้อมูลห้องประชุม "${updatedRoom.name}" สำเร็จ`, 'success');
+    updateRoomInFirestore(updatedRoom.id, updatedRoom)
+      .then(() => {
+        showToast(`แก้ไขข้อมูลห้องประชุม "${updatedRoom.name}" สำเร็จและบันทึกลงฐานข้อมูลแล้ว`, 'success');
+      })
+      .catch((err) => {
+        console.error('Error updating room in Firestore:', err);
+        showToast(`บันทึกในเครื่องแล้ว แต่บันทึกคลาวด์ไม่สำเร็จ (${err?.message || 'สิทธิ์การเข้าถึงถูกจำกัด'})`, 'error');
+      });
   };
 
   const handleDeleteRoom = (roomId: string) => {
@@ -855,8 +1003,14 @@ export default function App() {
       ],
       onConfirm: () => {
         setRooms((prev) => prev.filter((r) => r.id !== roomId));
-        deleteRoomFromFirestore(roomId).catch(console.warn);
-        showToast(`ลบห้องประชุม "${room.name}" เรียบร้อยแล้ว`, 'info');
+        deleteRoomFromFirestore(roomId)
+          .then(() => {
+            showToast(`ลบห้องประชุม "${room.name}" เรียบร้อยแล้ว`, 'info');
+          })
+          .catch((err) => {
+            console.error('Error deleting room from Firestore:', err);
+            showToast(`ลบในเครื่องแล้ว (คลาวด์: ${err?.message || 'ข้อผิดพลาด'})`, 'error');
+          });
       }
     });
   };
@@ -868,8 +1022,14 @@ export default function App() {
     setRooms((prev) =>
       prev.map((r) => (r.id === roomId ? { ...r, isActive: newStatus } : r))
     );
-    updateRoomInFirestore(roomId, { isActive: newStatus }).catch(console.warn);
-    showToast('ปรับปรุงสถานะห้องประชุมเรียบร้อยแล้ว', 'info');
+    updateRoomInFirestore(roomId, { isActive: newStatus })
+      .then(() => {
+        showToast('ปรับปรุงสถานะห้องประชุมเรียบร้อยแล้ว', 'info');
+      })
+      .catch((err) => {
+        console.error('Error toggling room status in Firestore:', err);
+        showToast(`ปรับปรุงสถานะในเครื่องแล้ว (คลาวด์: ${err?.message || 'ข้อผิดพลาด'})`, 'error');
+      });
   };
 
   // --- User Account Management Handlers (Admin Approval & Registration) ---
@@ -1221,6 +1381,7 @@ export default function App() {
               setIsCancelModalOpen(true);
             }}
             onBackToBooking={() => setActivePage('booking')}
+            onBatchImportBookings={handleBatchImportBookings}
           />
         </main>
       ) : (
@@ -1340,6 +1501,8 @@ export default function App() {
         initialTime={selectedSlotTime}
         bookingData={editingBooking}
         currentUser={currentUser}
+        bookings={bookings}
+        isSubmitting={isSubmittingBooking}
       />
 
       {/* 2. Booking Detail Modal with Google Calendar Sync & Actions */}
@@ -1435,7 +1598,9 @@ export default function App() {
         users={users}
         emailNotifications={emailNotifications}
         readNotificationIds={readNotificationIds}
+        deletedNotificationIds={deletedNotificationIds}
         onMarkNotificationsRead={handleMarkNotificationsRead}
+        onDeleteNotifications={handleDeleteNotifications}
         onOpenBooking={(bId) => {
           const found = bookings.find((b) => b.id === bId);
           if (found) {

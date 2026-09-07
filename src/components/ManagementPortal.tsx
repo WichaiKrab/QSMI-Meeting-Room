@@ -37,7 +37,8 @@ import {
   Sparkles,
   User,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  UploadCloud
 } from 'lucide-react';
 import { Booking, Room, UserAccount, UserRole, UserStatus, Department } from '../types';
 import { formatThaiDate, formatThaiTime } from '../utils/thaiDate';
@@ -45,6 +46,7 @@ import { exportBookingsToCSV } from '../utils/exportUtils';
 import { AdminReports } from './AdminReports';
 import { MyProfileTab } from './MyProfileTab';
 import { DepartmentManagementTab } from './DepartmentManagementTab';
+import { ImportExcelModal } from './ImportExcelModal';
 
 interface ManagementPortalProps {
   currentUser: UserAccount | null;
@@ -81,6 +83,8 @@ interface ManagementPortalProps {
   onAddDepartment?: (newDept: Omit<Department, 'id'>) => void;
   onUpdateDepartment?: (updatedDept: Department) => void;
   onDeleteDepartment?: (deptId: string) => void;
+  // Excel Import Handler
+  onBatchImportBookings?: (newBookings: Booking[]) => void;
 }
 
 export const ManagementPortal: React.FC<ManagementPortalProps> = ({
@@ -115,9 +119,11 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
   onUpdateUser,
   onAddDepartment,
   onUpdateDepartment,
-  onDeleteDepartment
+  onDeleteDepartment,
+  onBatchImportBookings
 }) => {
   // Login Form States (for View A)
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [roleTab, setRoleTab] = useState<'all' | UserRole>('all');
   const [selectedUser, setSelectedUser] = useState<UserAccount | null>(null);
   const [username, setUsername] = useState('');
@@ -1857,6 +1863,15 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                         <FileSpreadsheet size={14} />
                         <span>ส่งออก CSV</span>
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsImportModalOpen(true)}
+                        title="นำเข้าข้อมูลรายการจองห้องประชุมจากไฟล์ Excel (.xlsx, .xls, .csv)"
+                        className="flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold transition shadow-xs shrink-0 bg-blue-600 hover:bg-blue-700 text-white cursor-pointer active:scale-95"
+                      >
+                        <UploadCloud size={14} />
+                        <span>นำเข้า Excel</span>
+                      </button>
                     </div>
                   );
                 })()}
@@ -2882,6 +2897,20 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
             </form>
           </div>
         </div>
+      )}
+      {/* Import Excel Modal */}
+      {isImportModalOpen && (
+        <ImportExcelModal
+          isOpen={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+          rooms={rooms}
+          existingBookings={bookings}
+          onConfirmImport={(imported) => {
+            if (onBatchImportBookings) {
+              onBatchImportBookings(imported);
+            }
+          }}
+        />
       )}
     </div>
   );
