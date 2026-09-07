@@ -10,4 +10,6 @@ coverage/
 .idea/
 .vscode/
 *.pem
+firebase-applet-config.json
+firebase-blueprint.json
 
