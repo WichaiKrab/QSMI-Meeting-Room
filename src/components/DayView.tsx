@@ -18,7 +18,7 @@ interface DayViewProps {
   rooms: Room[];
   bookings: Booking[];
   isAdminMode: boolean;
-  onSlotClick: (room: Room, time: string) => void;
+  onSlotClick: (room: Room, time?: string) => void;
   onViewBooking: (booking: Booking) => void;
   onEditBooking?: (booking: Booking) => void;
   onDeleteBooking?: (id: string) => void;
@@ -92,7 +92,7 @@ export const DayView: React.FC<DayViewProps> = ({
                 {room.isActive ? (
                   <button
                     type="button"
-                    onClick={() => onSlotClick(room, '09:00')}
+                    onClick={() => onSlotClick(room)}
                     className="text-xs flex items-center gap-1 text-white px-3 py-1.5 rounded-xl shadow-xs transition font-bold bg-[#1a1a1a] hover:bg-black whitespace-nowrap shrink-0 active:scale-95"
                   >
                     <Plus size={14} /> จองห้องนี้

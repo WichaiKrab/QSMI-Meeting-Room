@@ -554,29 +554,67 @@ export default function App() {
   }, [currentUser, users, bookings, readNotificationIds, deletedNotificationIds]);
 
   // --- Handlers ---
-  const handleOpenSlot = (room: Room, time: string, customDate?: Date) => {
+  const handleOpenSlot = (room: Room, time?: string, customDate?: Date) => {
     const targetDate = customDate || currentDate;
-    const [h, m] = time.split(':').map(Number);
-    const slotDateTime = new Date(targetDate);
-    slotDateTime.setHours(h, m, 0, 0);
-
     const now = new Date();
-    const graceTime = new Date(now.getTime() - 60 * 1000);
+    const isToday =
+      targetDate.getFullYear() === now.getFullYear() &&
+      targetDate.getMonth() === now.getMonth() &&
+      targetDate.getDate() === now.getDate();
 
-    if (slotDateTime < graceTime) {
-      showToast('ไม่สามารถจองห้องประชุมย้อนหลังได้ กรุณาเลือกช่วงเวลาปัจจุบันหรือล่วงหน้า', 'error');
-      return;
+    let chosenTime = time;
+
+    // If time is provided, check if it is in the past
+    if (chosenTime) {
+      const [h, m] = chosenTime.split(':').map(Number);
+      const slotDateTime = new Date(targetDate);
+      slotDateTime.setHours(h, m, 0, 0);
+      const graceTime = new Date(now.getTime() - 60 * 1000);
+
+      // If requested for today and the requested slot time is in the past, auto-find next upcoming slot
+      if (slotDateTime < graceTime) {
+        if (isToday) {
+          const upcoming = SELECTABLE_TIMES.find((t) => {
+            const [th, tm] = t.split(':').map(Number);
+            const slotD = new Date();
+            slotD.setHours(th, tm, 0, 0);
+            return slotD > graceTime;
+          });
+          if (upcoming) {
+            chosenTime = upcoming;
+          } else {
+            showToast('หมดเวลาทำการจองสำหรับวันนี้แล้ว กรุณาเลือกวันอื่น', 'error');
+            return;
+          }
+        } else if (targetDate < new Date(now.getFullYear(), now.getMonth(), now.getDate())) {
+          showToast('ไม่สามารถจองห้องประชุมย้อนหลังได้ กรุณาเลือกช่วงเวลาปัจจุบันหรือล่วงหน้า', 'error');
+          return;
+        }
+      }
+    } else {
+      // If no time provided (e.g. from general "Book this room" button)
+      if (isToday) {
+        const upcoming = SELECTABLE_TIMES.find((t) => {
+          const [th, tm] = t.split(':').map(Number);
+          const slotD = new Date();
+          slotD.setHours(th, tm, 0, 0);
+          return slotD > new Date(now.getTime() - 60 * 1000);
+        });
+        chosenTime = upcoming || '09:00';
+      } else {
+        chosenTime = '09:00';
+      }
     }
 
     if (customDate) setCurrentDate(customDate);
     setSelectedSlotRoom(room);
-    setSelectedSlotTime(time);
+    setSelectedSlotTime(chosenTime);
     setEditingBooking(null);
 
     // If not logged in: display login modal first with context
     if (!currentUser) {
-      setPendingBookingSlot({ room, time, date: customDate || currentDate });
-      setLoginModalReason(`กรุณาเข้าสู่ระบบก่อนทำการจองห้อง "${room.name}" (ช่วงเวลา ${time})`);
+      setPendingBookingSlot({ room, time: chosenTime, date: customDate || currentDate });
+      setLoginModalReason(`กรุณาเข้าสู่ระบบก่อนทำการจองห้อง "${room.name}" (ช่วงเวลา ${chosenTime})`);
       setIsSsoModalOpen(true);
       return;
     }

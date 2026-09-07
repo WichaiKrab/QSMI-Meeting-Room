@@ -159,7 +159,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onSlotClick(targetRoom, '09:00', cellDate);
+                        onSlotClick(targetRoom, undefined, cellDate);
                       }}
                       className="hidden sm:inline-flex opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-[#C8102E] hover:bg-red-50 rounded transition text-[11px] items-center gap-0.5"
                       title="จองห้องนี้ในวันนี้"

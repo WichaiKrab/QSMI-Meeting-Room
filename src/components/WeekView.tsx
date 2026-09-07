@@ -162,7 +162,7 @@ export const WeekView: React.FC<WeekViewProps> = ({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onSlotClick(targetRoom, '09:00', dayDate);
+                        onSlotClick(targetRoom, undefined, dayDate);
                       }}
                       className="text-xs flex items-center gap-1 text-white px-2.5 py-1 rounded-xl shadow-xs transition font-bold bg-[#1a1a1a] hover:bg-black"
                     >
