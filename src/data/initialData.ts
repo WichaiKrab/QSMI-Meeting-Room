@@ -284,7 +284,7 @@ export const CORPORATE_USERS: UserAccount[] = [
 ];
 
 export const ADMIN_PASSWORD = 'admin123';
-export const OWNER_EMAILS = ['Wsritangkum@gmail.com', 'qsmimeeting@gmail.com'];
+export const OWNER_EMAILS = ['Wsritangkum@gmail.com'];
 
 // Generate sample dates relative to today
 const getIsoForHour = (daysOffset: number, hour: number, minute: number = 0) => {

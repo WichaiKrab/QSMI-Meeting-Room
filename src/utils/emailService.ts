@@ -382,7 +382,8 @@ export const createEmailNotifications = (
   // 2. Email for Admin (OWNER_EMAILS)
   // Approval button is ONLY generated for Admin notifications when the status is pending / type is RECEIVED
   const isPendingStatus = type === 'RECEIVED' || booking.status === 'pending';
-  const approvalLink = isPendingStatus ? `#bookingId=${booking.id}` : undefined;
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://' + (typeof window !== 'undefined' ? window.location.host : 'qsmi-meeting-room.web.app');
+  const approvalLink = isPendingStatus ? `${baseUrl}/#bookingId=${booking.id}` : undefined;
   const adminSubject = `[แจ้งเตือน Super Admin/Admin] ${subject}`;
   const adminHtml = buildEmailHtml({
     statusBadgeText,

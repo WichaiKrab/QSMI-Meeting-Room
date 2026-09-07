@@ -348,11 +348,15 @@ export default function App() {
     localStorage.setItem('meeting_app_admin_auth', isAuthenticated ? 'true' : 'false');
   }, [isAuthenticated]);
 
-  // Prevent BookingDetailModal from popping up on initial page load
-  // Clean up any lingering or stale hash in URL and only handle explicit user hashchange events
+  const [pendingHashBookingId, setPendingHashBookingId] = useState<string | null>(null);
+
   useEffect(() => {
-    // 1. Immediately clear any lingering hash on page load so the main calendar displays cleanly
-    if (window.location.hash) {
+    // Capture the hash on initial load
+    if (window.location.hash && window.location.hash.includes('bookingId=')) {
+      const id = window.location.hash.split('bookingId=')[1]?.replace(/[^a-zA-Z0-9_-]/g, '');
+      if (id) {
+        setPendingHashBookingId(id);
+      }
       try {
         window.history.replaceState(
           null,
@@ -362,19 +366,14 @@ export default function App() {
       } catch (_) {}
     }
 
-    // 2. Handle active in-session hash change if a user triggers an action
+    // Handle active in-session hash change
     const handleHashChange = () => {
       const hash = window.location.hash;
       if (hash && hash.includes('bookingId=')) {
         const id = hash.split('bookingId=')[1]?.replace(/[^a-zA-Z0-9_-]/g, '');
         if (id) {
-          const found = bookings.find((b) => b.id === id);
-          if (found) {
-            setViewingBooking(found);
-            setIsDetailModalOpen(true);
-          }
+          setPendingHashBookingId(id);
         }
-        // Clean up hash immediately so refreshing won't reopen the modal
         try {
           window.history.replaceState(
             null,
@@ -387,7 +386,25 @@ export default function App() {
 
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [bookings]);
+  }, []);
+
+  // Open the modal when bookings are loaded and we have a pending hash
+  useEffect(() => {
+    if (pendingHashBookingId && bookings.length > 0) {
+      const found = bookings.find((b) => String(b.id) === pendingHashBookingId);
+      if (found) {
+        setViewingBooking(found);
+        setIsDetailModalOpen(true);
+      } else {
+        // Optionally show toast if not found, but it might just be loading still.
+        // If we only show toast when we are sure it doesn't exist, we need to know when fetching is done.
+        // For now, if not found, maybe just wait. Or clear it.
+        // Actually, if it's not found in initial bookings, it might be an invalid id. Let's assume bookings is loaded.
+        showToast(`ไม่พบรายการจองรหัส ${pendingHashBookingId} ในระบบ`, 'error');
+      }
+      setPendingHashBookingId(null);
+    }
+  }, [pendingHashBookingId, bookings]);
 
   // Unread emails count
   const unreadEmailCount = useMemo(() => {
