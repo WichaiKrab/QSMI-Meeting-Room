@@ -50,6 +50,8 @@ export interface Booking {
   cancelledAt?: string;
   cancellationReason?: string;
   syncedToGoogleCalendar?: boolean;
+  isImported?: boolean;
+  suppressEmail?: boolean;
 }
 
 export interface UserAccount {

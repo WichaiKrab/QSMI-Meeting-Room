@@ -865,19 +865,30 @@ export default function App() {
     }
   };
 
-  const handleBatchImportBookings = async (newBookings: Booking[]) => {
+  const handleBatchImportBookings = async (
+    newBookings: Booking[],
+    options?: { suppressEmail?: boolean }
+  ) => {
     if (!newBookings || newBookings.length === 0) return;
 
-    setBookings((prev) => [...newBookings, ...prev]);
+    // Stamp bookings with isImported and suppressEmail flags (default: true per user request)
+    const sanitizedBookings = newBookings.map((b) => ({
+      ...b,
+      isImported: true,
+      suppressEmail: options?.suppressEmail !== false
+    }));
 
-    for (const b of newBookings) {
+    setBookings((prev) => [...sanitizedBookings, ...prev]);
+
+    for (const b of sanitizedBookings) {
       saveBookingToFirestore(b).catch((err) =>
         console.warn('Error saving imported booking to Firestore:', b.id, err)
       );
     }
 
+    // Explicitly NO email notifications are generated or sent for Excel imports
     showToast(
-      `นำเข้าข้อมูลรายการจองสำเร็จทั้งหมด ${newBookings.length} รายการ`,
+      `นำเข้าข้อมูลรายการจองสำเร็จทั้งหมด ${sanitizedBookings.length} รายการ (ไม่ส่งอีเมลแจ้งเตือน)`,
       'success'
     );
   };

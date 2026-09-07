@@ -14,7 +14,8 @@ import {
   Check,
   Trash2,
   Info,
-  FileDown
+  FileDown,
+  BellOff
 } from 'lucide-react';
 import { Booking, Room } from '../types';
 import {
@@ -28,7 +29,7 @@ interface ImportExcelModalProps {
   onClose: () => void;
   rooms: Room[];
   existingBookings: Booking[];
-  onConfirmImport: (newBookings: Booking[]) => void;
+  onConfirmImport: (newBookings: Booking[], options?: { suppressEmail?: boolean }) => void;
 }
 
 export const ImportExcelModal: React.FC<ImportExcelModalProps> = ({
@@ -51,6 +52,7 @@ export const ImportExcelModal: React.FC<ImportExcelModalProps> = ({
   const [showGuide, setShowGuide] = useState(false);
   const [copiedRoomName, setCopiedRoomName] = useState<string | null>(null);
   const [disallowPastBookings, setDisallowPastBookings] = useState(true);
+  const [suppressEmailNotifications, setSuppressEmailNotifications] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -139,7 +141,12 @@ export const ImportExcelModal: React.FC<ImportExcelModalProps> = ({
     if (!validationResult || validationResult.readyBookings.length === 0) return;
     setIsImporting(true);
     try {
-      onConfirmImport(validationResult.readyBookings);
+      const sanitizedBookings = validationResult.readyBookings.map((b) => ({
+        ...b,
+        isImported: true,
+        suppressEmail: suppressEmailNotifications
+      }));
+      onConfirmImport(sanitizedBookings, { suppressEmail: suppressEmailNotifications });
       onClose();
     } finally {
       setIsImporting(false);
@@ -320,22 +327,48 @@ export const ImportExcelModal: React.FC<ImportExcelModalProps> = ({
 
           {/* Step 2: Upload Area */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
               <label className="text-xs font-bold text-gray-700">
                 เลือกหรือลากไฟล์ Excel ที่ต้องการนำเข้า <span className="text-red-500">*</span>
               </label>
 
-              {/* Validation Option: Disallow past bookings */}
-              <label className="flex items-center gap-1.5 text-xs text-gray-600 font-semibold cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={disallowPastBookings}
-                  onChange={(e) => handleTogglePastCheck(e.target.checked)}
-                  className="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                />
-                <span>ไม่อนุญาตให้จองย้อนหลังในอดีต</span>
-              </label>
+              <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+                {/* Validation Option: Disallow past bookings */}
+                <label className="flex items-center gap-1.5 text-xs text-gray-600 font-semibold cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={disallowPastBookings}
+                    onChange={(e) => handleTogglePastCheck(e.target.checked)}
+                    className="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <span>ไม่อนุญาตให้จองย้อนหลังในอดีต</span>
+                </label>
+
+                {/* Email Option: Suppress email notifications (Checked by default) */}
+                <label className="flex items-center gap-1.5 text-xs text-emerald-900 font-semibold cursor-pointer select-none bg-emerald-50/90 px-2.5 py-1 rounded-lg border border-emerald-200">
+                  <input
+                    type="checkbox"
+                    checked={suppressEmailNotifications}
+                    onChange={(e) => setSuppressEmailNotifications(e.target.checked)}
+                    className="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <span className="flex items-center gap-1">
+                    <BellOff size={13} className="text-emerald-700" />
+                    <span>ไม่ส่งอีเมลแจ้งเตือน</span>
+                  </span>
+                </label>
+              </div>
             </div>
+
+            {/* Notification Information Banner */}
+            {suppressEmailNotifications && (
+              <div className="mb-2.5 flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-600">
+                <BellOff size={14} className="text-slate-500 shrink-0" />
+                <span>
+                  <strong>การแจ้งเตือน:</strong> ไม่มีการส่งอีเมลแจ้งเตือนสำหรับการนำเข้าจากไฟล์ Excel (ข้อมูลจะถูกบันทึกและแสดงในปฏิทินทันที)
+                </span>
+              </div>
+            )}
 
             <div
               onDrop={handleDrop}

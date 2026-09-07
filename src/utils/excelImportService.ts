@@ -756,6 +756,8 @@ export const parseAndValidateImportFile = async (
         note,
         status: 'approved', // imported by admin directly as approved
         isBlocked: false,
+        isImported: true,
+        suppressEmail: true,
         createdAt: new Date().toISOString()
       };
       validBatchBookings.push(bookingObj);

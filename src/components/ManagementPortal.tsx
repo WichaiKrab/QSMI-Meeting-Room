@@ -87,7 +87,7 @@ interface ManagementPortalProps {
   onUpdateDepartment?: (updatedDept: Department) => void;
   onDeleteDepartment?: (deptId: string) => void;
   // Excel Import Handler
-  onBatchImportBookings?: (newBookings: Booking[]) => void;
+  onBatchImportBookings?: (newBookings: Booking[], options?: { suppressEmail?: boolean }) => void;
 }
 
 export const ManagementPortal: React.FC<ManagementPortalProps> = ({
@@ -3092,9 +3092,9 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
           onClose={() => setIsImportModalOpen(false)}
           rooms={rooms}
           existingBookings={bookings}
-          onConfirmImport={(imported) => {
+          onConfirmImport={(imported, options) => {
             if (onBatchImportBookings) {
-              onBatchImportBookings(imported);
+              onBatchImportBookings(imported, options);
             }
           }}
         />
