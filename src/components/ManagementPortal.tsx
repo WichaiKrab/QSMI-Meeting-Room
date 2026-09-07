@@ -723,7 +723,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                       required
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
-                      placeholder="เช่น admin1, mgr1 หรือคลิกเลือกด้านซ้าย"
+                      placeholder="เช่น admin หรือคลิกเลือกด้านซ้าย"
                       className="w-full p-2.5 border border-gray-300 rounded-xl text-xs sm:text-sm font-medium text-gray-900 outline-none focus:ring-2 focus:ring-[#C8102E]"
                     />
                   </div>

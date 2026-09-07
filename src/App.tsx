@@ -114,8 +114,10 @@ export default function App() {
     try {
       const saved = localStorage.getItem('meeting_app_emails');
       if (saved) return JSON.parse(saved);
-      // Generate initial welcome emails for existing bookings
-      return createEmailNotifications(INITIAL_BOOKINGS[0], 'APPROVED', INITIAL_ROOMS);
+      if (INITIAL_BOOKINGS.length > 0 && INITIAL_BOOKINGS[0]) {
+        return createEmailNotifications(INITIAL_BOOKINGS[0], 'APPROVED', INITIAL_ROOMS);
+      }
+      return [];
     } catch {
       return [];
     }
