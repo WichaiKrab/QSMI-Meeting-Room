@@ -208,6 +208,7 @@ export const buildEmailHtml = (data: {
 // Send real email via Vercel Serverless Function or Backend API endpoint
 export async function sendEmailViaApi(payload: {
   to: string;
+  from?: string;
   subject: string;
   text: string;
   html: string;
@@ -218,7 +219,10 @@ export async function sendEmailViaApi(payload: {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        ...payload,
+        from: payload.from || 'ระบบจองห้องประชุม <wsritangkum@gmail.com>',
+      }),
     });
     if (res.ok) {
       const data = await res.json();

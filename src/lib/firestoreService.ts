@@ -293,9 +293,14 @@ export async function saveEmailNotificationToFirestore(notification: EmailNotifi
 
   // 2. Add to mail collection (triggers Firebase Trigger Email extension or Vercel serverless mailer)
   try {
+    const senderName = 'ระบบจองห้องประชุม <wsritangkum@gmail.com>';
     await setDoc(doc(db, MAIL_QUEUE_COL, `queue-${notification.id}`), {
       to: [notification.recipient],
+      from: senderName,
+      replyTo: 'wsritangkum@gmail.com',
       message: {
+        from: senderName,
+        replyTo: 'wsritangkum@gmail.com',
         subject: notification.subject,
         text: notification.bodyText,
         html: notification.htmlBody,

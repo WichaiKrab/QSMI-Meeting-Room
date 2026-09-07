@@ -21,7 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { to, subject, text, html } = req.body || {};
+    const { to, from, subject, text, html } = req.body || {};
 
     if (!to || !subject || (!text && !html)) {
       return res.status(400).json({ error: 'Missing required fields: to, subject, text or html' });
@@ -46,7 +46,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const smtpPass = process.env.SMTP_PASS || process.env.EMAIL_PASS || process.env.EMAIL_APP_PASSWORD;
     const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
     const smtpPort = Number(process.env.SMTP_PORT) || 465;
-    const smtpFrom = process.env.EMAIL_FROM || `"ระบบจองห้องประชุม สถานเสาวภา" <${smtpUser || 'noreply@saovabha.org'}>`;
+    const defaultFrom = `"ระบบจองห้องประชุม" <${smtpUser || 'wsritangkum@gmail.com'}>`;
+    const smtpFrom = process.env.EMAIL_FROM || from || defaultFrom;
 
     if (!smtpUser || !smtpPass) {
       return res.status(200).json({
