@@ -280,7 +280,8 @@ export const CORPORATE_USERS: UserAccount[] = [
     avatarColor: 'bg-purple-600',
     email: 'Wsritangkum@gmail.com',
     phone: '0810001122',
-    status: 'approved'
+    status: 'approved',
+    receiveEmailNotifications: true
   }
 ];
 

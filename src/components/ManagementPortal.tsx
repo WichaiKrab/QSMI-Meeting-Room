@@ -31,6 +31,7 @@ import {
   UserPlus,
   UserMinus,
   Mail,
+  MailX,
   Phone,
   ToggleLeft,
   ToggleRight,
@@ -252,6 +253,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
   const [newAdminUserRole, setNewAdminUserRole] = useState<UserRole>('employee');
   const [newAdminUserEmail, setNewAdminUserEmail] = useState('');
   const [newAdminUserPhone, setNewAdminUserPhone] = useState('');
+  const [newAdminUserReceiveEmail, setNewAdminUserReceiveEmail] = useState(true);
 
   // Admin Edit User Modal State
   const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
@@ -263,12 +265,13 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
   const [editUserEmail, setEditUserEmail] = useState('');
   const [editUserPhone, setEditUserPhone] = useState('');
   const [editUserPassword, setEditUserPassword] = useState('');
+  const [editUserReceiveEmail, setEditUserReceiveEmail] = useState(true);
 
   // Compute Pending Approvals for Bookings (Admin & Manager) - Sorted latest incoming first
   const pendingApprovals = useMemo(() => {
     return bookings
       .filter((b) => {
-        if (b.status !== 'pending') return false;
+        if (b.status !== 'pending' || b.isBlocked) return false;
         if (isAdmin || isManager) return true;
         return false;
       })
@@ -402,6 +405,10 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
       approvedAt: new Date().toISOString(),
       approvedBy: currentUser?.name || 'Admin',
       registeredAt: new Date().toISOString(),
+      receiveEmailNotifications:
+        newAdminUserRole === 'admin' || newAdminUserRole === 'manager'
+          ? newAdminUserReceiveEmail
+          : undefined,
       avatarColor:
         newAdminUserRole === 'admin'
           ? 'bg-purple-600'
@@ -416,6 +423,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
     setIsAddUserModalOpen(false);
     setNewAdminUserName('');
     setNewAdminUserUsername('');
+    setNewAdminUserReceiveEmail(true);
   };
 
   const handleAdminStartEditUser = (u: UserAccount) => {
@@ -428,6 +436,23 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
     setEditUserEmail(u.email || '');
     setEditUserPhone(u.phone || '');
     setEditUserPassword(u.password || '1234');
+    setEditUserReceiveEmail(u.receiveEmailNotifications !== false);
+  };
+
+  const handleToggleAdminEmailNotification = (u: UserAccount) => {
+    if (!isAdmin) {
+      alert('เฉพาะ Super Admin เท่านั้นที่สามารถกำหนดสิทธิ์การรับอีเมลแจ้งเตือนได้');
+      return;
+    }
+    const currentVal = u.receiveEmailNotifications !== false;
+    const newVal = !currentVal;
+    const updated: UserAccount = {
+      ...u,
+      receiveEmailNotifications: newVal
+    };
+    if (onUpdateUser) {
+      onUpdateUser(updated);
+    }
   };
 
   const handleAdminSaveEditedUser = (e: React.FormEvent) => {
@@ -444,6 +469,10 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
       email: editUserEmail.trim(),
       phone: editUserPhone.trim(),
       password: editUserPassword || editingUser.password || '1234',
+      receiveEmailNotifications:
+        editUserRole === 'admin' || editUserRole === 'manager'
+          ? editUserReceiveEmail
+          : undefined,
       avatarColor:
         editUserRole === 'admin'
           ? 'bg-purple-600'
@@ -512,11 +541,11 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
         if (userSearchTerm.trim()) {
           const term = userSearchTerm.toLowerCase();
           return (
-            u.name.toLowerCase().includes(term) ||
-            u.username.toLowerCase().includes(term) ||
-            u.department.toLowerCase().includes(term) ||
-            (u.title && u.title.toLowerCase().includes(term)) ||
-            (u.email && u.email.toLowerCase().includes(term))
+            (u.name || '').toLowerCase().includes(term) ||
+            (u.username || '').toLowerCase().includes(term) ||
+            (u.department || '').toLowerCase().includes(term) ||
+            Boolean(u.title && u.title.toLowerCase().includes(term)) ||
+            Boolean(u.email && u.email.toLowerCase().includes(term))
           );
         }
         return true;
@@ -656,10 +685,10 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                               u.avatarColor || 'bg-gray-500'
                             }`}
                           >
-                            {u.name.charAt(0)}
+                            {(u.name || u.username || 'U').charAt(0)}
                           </div>
                           <div className="min-w-0">
-                            <div className="font-bold text-gray-900 truncate">{u.name}</div>
+                            <div className="font-bold text-gray-900 truncate">{u.name || u.username || 'ผู้ใช้งาน'}</div>
                             <div className="text-[11px] text-gray-500 truncate">{u.department}</div>
                           </div>
                         </div>
@@ -919,12 +948,12 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
               currentUser?.avatarColor || 'bg-red-600'
             }`}
           >
-            {currentUser?.name.charAt(0) || 'A'}
+            {(currentUser?.name || currentUser?.username || 'A').charAt(0)}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-base sm:text-lg font-bold text-gray-900 truncate">
-                {currentUser?.name || 'ผู้ดูแลระบบสูงสุด (Super Admin)'}
+                {currentUser?.name || currentUser?.username || 'ผู้ดูแลระบบสูงสุด (Super Admin)'}
               </h2>
               <span
                 className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
@@ -1317,11 +1346,11 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                                 applicant.avatarColor || 'bg-teal-600'
                               }`}
                             >
-                              {applicant.name.charAt(0)}
+                              {(applicant.name || applicant.username || 'U').charAt(0)}
                             </div>
                             <div>
                               <div className="flex items-center gap-2 flex-wrap">
-                                <h5 className="text-sm font-bold text-gray-900">{applicant.name}</h5>
+                                <h5 className="text-sm font-bold text-gray-900">{applicant.name || applicant.username || 'ผู้ใช้งาน'}</h5>
                                 <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">
                                   {applicant.role === 'manager' ? 'ขอสิทธิ์: ผู้ดูแลระบบ (Admin)' : 'ขอสิทธิ์: ผู้ใช้งานทั่วไป (User)'}
                                 </span>
@@ -1485,10 +1514,10 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                                 u.avatarColor || 'bg-gray-500'
                               }`}
                             >
-                              {u.name.charAt(0)}
+                              {(u.name || u.username || 'U').charAt(0)}
                             </div>
                             <div className="min-w-0">
-                              <h5 className="font-bold text-sm text-gray-900 leading-tight truncate">{u.name}</h5>
+                              <h5 className="font-bold text-sm text-gray-900 leading-tight truncate">{u.name || u.username || 'ผู้ใช้งาน'}</h5>
                               <p className="text-xs text-gray-500 truncate mt-0.5">{u.title || '-'}</p>
                             </div>
                           </div>
@@ -1560,6 +1589,51 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                           </select>
                         </div>
 
+                        {/* Email Notification Toggle for Admins */}
+                        {(u.role === 'admin' || u.role === 'manager') && (
+                          <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100">
+                            <div className="flex items-center gap-1.5 text-xs text-gray-600 font-medium">
+                              <Mail size={13} className="text-blue-600" />
+                              <span>อีเมลแจ้งเตือน:</span>
+                            </div>
+                            {isAdmin ? (
+                              <button
+                                type="button"
+                                onClick={() => handleToggleAdminEmailNotification(u)}
+                                title="คลิกเพื่อสลับการรับหรือไม่รับอีเมลแจ้งเตือน (Super Admin กำหนด)"
+                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer ${
+                                  u.receiveEmailNotifications !== false
+                                    ? 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
+                                    : 'bg-gray-100 text-gray-500 border border-gray-200 hover:bg-gray-200'
+                                }`}
+                              >
+                                {u.receiveEmailNotifications !== false ? (
+                                  <>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></span>
+                                    <Mail size={12} className="text-blue-600" />
+                                    <span>รับอีเมล</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <MailX size={12} className="text-gray-400" />
+                                    <span>ไม่รับ</span>
+                                  </>
+                                )}
+                              </button>
+                            ) : (
+                              <span
+                                className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
+                                  u.receiveEmailNotifications !== false
+                                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                    : 'bg-gray-100 text-gray-500 border border-gray-200'
+                                }`}
+                              >
+                                {u.receiveEmailNotifications !== false ? 'รับอีเมล' : 'ไม่รับ'}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
                         {/* Action Buttons */}
                         <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
                           {isPending && (
@@ -1604,6 +1678,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                       <th className="p-3">ชื่อเข้าระบบ (Username)</th>
                       <th className="p-3">ฝ่าย / หน่วยงาน</th>
                       <th className="p-3">ระดับสิทธิ์ (Role)</th>
+                      <th className="p-3 text-center">แจ้งเตือนอีเมล</th>
                       <th className="p-3">สถานะ</th>
                       <th className="p-3 text-right">การจัดการ</th>
                     </tr>
@@ -1611,7 +1686,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                   <tbody className="divide-y divide-gray-100 bg-white">
                     {filteredUsers.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="text-center py-8 text-gray-400 font-semibold">
+                        <td colSpan={7} className="text-center py-8 text-gray-400 font-semibold">
                           ไม่พบข้อมูลผู้ใช้งานที่ตรงกับเงื่อนไข
                         </td>
                       </tr>
@@ -1629,10 +1704,10 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                                     u.avatarColor || 'bg-gray-500'
                                   }`}
                                 >
-                                  {u.name.charAt(0)}
+                                  {(u.name || u.username || 'U').charAt(0)}
                                 </div>
                                 <div>
-                                  <div className="font-bold text-gray-900">{u.name}</div>
+                                  <div className="font-bold text-gray-900">{u.name || u.username || 'ผู้ใช้งาน'}</div>
                                   <div className="text-[11px] text-gray-500">{u.title || '-'}</div>
                                 </div>
                               </div>
@@ -1666,6 +1741,64 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                                 <option value="manager">ผู้ดูแลระบบ (Admin)</option>
                                 <option value="admin">ผู้ดูแลระบบสูงสุด (Super Admin)</option>
                               </select>
+                            </td>
+
+                            <td className="p-3 text-center">
+                              {u.role === 'admin' || u.role === 'manager' ? (
+                                isAdmin ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleAdminEmailNotification(u)}
+                                    title={
+                                      u.receiveEmailNotifications !== false
+                                        ? `คลิกเพื่อปิดรับอีเมลแจ้งเตือนสำหรับ ${u.name} (ปัจจุบัน: เปิดรับ)`
+                                        : `คลิกเพื่อเปิดรับอีเมลแจ้งเตือนสำหรับ ${u.name} (ปัจจุบัน: ปิดรับ)`
+                                    }
+                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition shadow-2xs cursor-pointer ${
+                                      u.receiveEmailNotifications !== false
+                                        ? 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 hover:border-blue-300'
+                                        : 'bg-gray-100 text-gray-500 border border-gray-200 hover:bg-gray-200 hover:text-gray-700'
+                                    }`}
+                                  >
+                                    {u.receiveEmailNotifications !== false ? (
+                                      <>
+                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></span>
+                                        <Mail size={12} className="text-blue-600" />
+                                        <span>รับอีเมล</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <MailX size={12} className="text-gray-400" />
+                                        <span>ไม่รับ</span>
+                                      </>
+                                    )}
+                                  </button>
+                                ) : (
+                                  <span
+                                    title="Super Admin เป็นผู้กำหนดสิทธิ์นี้"
+                                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                                      u.receiveEmailNotifications !== false
+                                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                        : 'bg-gray-100 text-gray-500 border border-gray-200'
+                                    }`}
+                                  >
+                                    {u.receiveEmailNotifications !== false ? (
+                                      <>
+                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                                        <Mail size={12} className="text-blue-600" />
+                                        <span>รับอีเมล</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <MailX size={12} className="text-gray-400" />
+                                        <span>ไม่รับ</span>
+                                      </>
+                                    )}
+                                  </span>
+                                )
+                              ) : (
+                                <span className="text-gray-300 text-[11px]">-</span>
+                              )}
                             </td>
 
                             <td className="p-3">
@@ -2271,6 +2404,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
             bookings={bookings}
             rooms={rooms}
             currentUser={currentUser}
+            isAdminMode={isAdmin || isManager}
             onViewBooking={onViewBooking}
             onRequestCancel={onRequestCancel}
             onOpenNewBooking={onBackToBooking}
@@ -2683,6 +2817,41 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                 </div>
               </div>
 
+              {(newAdminUserRole === 'admin' || newAdminUserRole === 'manager') && (
+                <div
+                  className={`p-3 rounded-2xl border transition ${
+                    newAdminUserReceiveEmail
+                      ? 'bg-blue-50/70 border-blue-200'
+                      : 'bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-gray-900">
+                        <Mail
+                          size={14}
+                          className={newAdminUserReceiveEmail ? 'text-blue-600' : 'text-gray-400'}
+                        />
+                        <span>รับอีเมลแจ้งเตือนของระบบ (Admin Email Notification)</span>
+                      </div>
+                      <p className="text-[11px] text-gray-500 leading-relaxed">
+                        เปิดรับการแจ้งเตือนทางอีเมลเมื่อมีรายการขอจองใหม่ การอนุมัติ หรือการยกเลิกห้องประชุม
+                      </p>
+                    </div>
+
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                      <input
+                        type="checkbox"
+                        checked={newAdminUserReceiveEmail}
+                        onChange={(e) => setNewAdminUserReceiveEmail(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-end gap-2 pt-2">
                 <button
                   type="button"
@@ -2843,6 +3012,58 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                   className="w-full p-2 border border-gray-300 rounded-xl text-xs font-medium text-gray-900 outline-none focus:ring-2 focus:ring-blue-600"
                 />
               </div>
+
+              {(editUserRole === 'admin' || editUserRole === 'manager') && (
+                <div
+                  className={`p-3.5 rounded-2xl border transition ${
+                    editUserReceiveEmail
+                      ? 'bg-blue-50/70 border-blue-200'
+                      : 'bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-gray-900">
+                        <Mail
+                          size={14}
+                          className={editUserReceiveEmail ? 'text-blue-600' : 'text-gray-400'}
+                        />
+                        <span>รับอีเมลแจ้งเตือนของระบบ (Admin Email Notification)</span>
+                      </div>
+                      <p className="text-[11px] text-gray-500 leading-relaxed">
+                        ส่งอีเมลแจ้งเตือนเมื่อมีการจองใหม่ การอนุมัติ หรือการยกเลิกห้องประชุม
+                        {!isAdmin && (
+                          <span className="text-amber-600 font-semibold block mt-0.5">
+                            *เฉพาะ Super Admin เท่านั้นที่เป็นผู้กำหนดสิทธิ์นี้
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
+                    <label
+                      className={`relative inline-flex items-center shrink-0 mt-0.5 ${
+                        isAdmin ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        disabled={!isAdmin}
+                        checked={editUserReceiveEmail}
+                        onChange={(e) => setEditUserReceiveEmail(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+
+                  {!editUserEmail && editUserReceiveEmail && (
+                    <div className="mt-2 text-[11px] text-amber-800 bg-amber-50 p-2 rounded-xl border border-amber-200 flex items-center gap-1.5">
+                      <AlertCircle size={13} className="shrink-0" />
+                      <span>ยังไม่ได้ระบุอีเมลด้านบน โปรดใส่อีเมลเพื่อให้ระบบจัดส่งข้อความแจ้งเตือนได้</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="flex items-center justify-end gap-2 pt-2">
                 <button

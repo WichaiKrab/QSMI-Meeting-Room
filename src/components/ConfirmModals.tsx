@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Lock, AlertCircle, Ban, AlertTriangle, Send, Check, User, Eye, EyeOff } from 'lucide-react';
 import { Booking, Room, UserAccount } from '../types';
 import { CORPORATE_USERS } from '../data/initialData';
+import { isBookingInPast } from '../utils/thaiDate';
 
 /* 1. ADMIN LOGIN MODAL */
 interface AdminLoginModalProps {
@@ -206,6 +207,10 @@ export const CancelBookingModal: React.FC<CancelBookingModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const isPast = isBookingInPast(booking);
+  const isUserAdmin = Boolean(isAdminMode || currentUser?.role === 'admin' || currentUser?.role === 'manager');
+  const isPastUserBlock = !isUserAdmin && isPast;
+
   const room = rooms.find((r) => r.id === booking.roomId);
   const roomName = room ? room.name : 'ห้องประชุม';
 
@@ -213,6 +218,10 @@ export const CancelBookingModal: React.FC<CancelBookingModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isPastUserBlock) {
+      setError('บัญชี User ไม่สามารถยกเลิกการจองในวันที่และเวลาที่ผ่านมาแล้วได้');
+      return;
+    }
     setError('');
     setLoading(true);
     try {
@@ -275,6 +284,19 @@ export const CancelBookingModal: React.FC<CancelBookingModalProps> = ({
           </div>
         </div>
 
+        {/* Past Booking Restriction for Regular Users */}
+        {isPastUserBlock && (
+          <div className="mb-3 p-3 bg-red-50 text-red-800 rounded-2xl border border-red-200 text-xs flex items-start gap-2">
+            <AlertCircle size={16} className="text-red-600 shrink-0 mt-0.5" />
+            <div>
+              <div className="font-bold text-red-900">ไม่สามารถยกเลิกการจองได้</div>
+              <div className="text-[11px] text-red-700 mt-0.5">
+                บัญชี User ไม่สามารถยกเลิกการจองในวันที่และเวลาที่ผ่านมาแล้วได้ หากต้องการความช่วยเหลือโปรดติดต่อผู้ดูแลระบบ
+              </div>
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="mb-3 p-2 bg-red-100 text-red-700 rounded-xl text-xs font-bold flex items-center gap-1.5">
             <AlertCircle size={14} className="shrink-0" />
@@ -331,8 +353,8 @@ export const CancelBookingModal: React.FC<CancelBookingModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={loading}
-              className="flex-1 py-2.5 bg-[#C8102E] hover:bg-[#a00c24] text-white font-bold rounded-xl text-xs shadow-xs transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+              disabled={loading || isPastUserBlock}
+              className="flex-1 py-2.5 bg-[#C8102E] hover:bg-[#a00c24] text-white font-bold rounded-xl text-xs shadow-xs transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
             >
               <Ban size={14} />
               <span>{loading ? 'กำลังยกเลิก...' : 'ยืนยันการยกเลิก'}</span>

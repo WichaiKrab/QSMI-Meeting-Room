@@ -1,4 +1,4 @@
-import { Booking, Room, EmailNotification } from '../types';
+import { Booking, Room, EmailNotification, UserAccount } from '../types';
 import { OWNER_EMAILS } from '../data/initialData';
 import { formatThaiDate, formatThaiTime } from './thaiDate';
 import { saveEmailNotificationToFirestore } from '../lib/firestoreService';
@@ -238,7 +238,8 @@ export const createEmailNotifications = (
   booking: Booking,
   type: 'RECEIVED' | 'APPROVED' | 'REJECTED' | 'CANCELLED',
   rooms: Room[],
-  reason?: string
+  reason?: string,
+  users?: UserAccount[]
 ): EmailNotification[] => {
   if (booking.isBlocked) return [];
 
@@ -379,7 +380,39 @@ export const createEmailNotifications = (
     }).catch(console.warn);
   }
 
-  // 2. Email for Admin (OWNER_EMAILS)
+  // 2. Email for Admin Accounts (Configured by Super Admin)
+  // Find all admin accounts (role: admin or manager) who have email and have notifications enabled
+  let adminRecipients: string[] = [];
+  let effectiveUsers = users;
+  if ((!effectiveUsers || effectiveUsers.length === 0) && typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('meeting_rooms_corporate_users');
+      if (saved) effectiveUsers = JSON.parse(saved);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  if (effectiveUsers && effectiveUsers.length > 0) {
+    const subscribedAdmins = effectiveUsers.filter((u) => {
+      const isAdminRole = u.role === 'admin' || u.role === 'manager';
+      const isApproved = !u.status || u.status === 'approved';
+      const hasEmail = !!u.email?.trim();
+      // If receiveEmailNotifications is explicitly false, do not receive
+      // If undefined, default to true for existing admins with email
+      const isSubscribed = u.receiveEmailNotifications !== false;
+      return isAdminRole && isApproved && hasEmail && isSubscribed;
+    });
+
+    const uniqueEmails = new Set<string>();
+    subscribedAdmins.forEach((u) => {
+      if (u.email?.trim()) uniqueEmails.add(u.email.trim());
+    });
+    adminRecipients = Array.from(uniqueEmails);
+  } else {
+    adminRecipients = [...OWNER_EMAILS];
+  }
+
   // Approval button is ONLY generated for Admin notifications when the status is pending / type is RECEIVED
   const isPendingStatus = type === 'RECEIVED' || booking.status === 'pending';
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://qsmi-meeting-room.web.app';
@@ -410,7 +443,7 @@ export const createEmailNotifications = (
     bookingId: booking.id
   });
 
-  OWNER_EMAILS.forEach((ownerEmail) => {
+  adminRecipients.forEach((ownerEmail) => {
     const adminNotif: EmailNotification = {
       id: `mail-admin-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
       bookingId: booking.id,

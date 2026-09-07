@@ -17,7 +17,7 @@ import {
   normalizeEquipmentName
 } from './data/initialData';
 import { createEmailNotifications } from './utils/emailService';
-import { checkBookingOverlap, formatThaiDate, formatThaiTime, SELECTABLE_TIMES } from './utils/thaiDate';
+import { checkBookingOverlap, formatThaiDate, formatThaiTime, isBookingInPast, SELECTABLE_TIMES } from './utils/thaiDate';
 import {
   initializeFirestoreDefaults,
   subscribeToRooms,
@@ -143,7 +143,16 @@ export default function App() {
       let rawUsers: UserAccount[] = saved ? JSON.parse(saved) : CORPORATE_USERS;
       if (Array.isArray(rawUsers) && rawUsers.length > 0) {
         const legacyMockUsers = new Set(['admin1', 'mgr1', 'mgr2', 'mgr3', 'user1', 'user2', 'user3', 'user4', 'user5', 'user6', 'user7', 'napa.reg', 'panu.reg']);
-        rawUsers = rawUsers.filter((u: UserAccount) => !legacyMockUsers.has(u.username));
+        rawUsers = rawUsers
+          .filter((u: UserAccount) => Boolean(u && u.username && !legacyMockUsers.has(u.username)))
+          .map((u: UserAccount) => ({
+            ...u,
+            name: u.name || u.username || 'ผู้ใช้งาน',
+            username: u.username || 'user',
+            department: u.department || 'ทั่วไป',
+            role: u.role || 'employee',
+            status: u.status || 'approved',
+          }));
         if (rawUsers.length === 0) return CORPORATE_USERS;
         return rawUsers;
       }
@@ -278,6 +287,26 @@ export default function App() {
         try {
           localStorage.setItem('meeting_app_users', JSON.stringify(cloudUsers));
         } catch (_) {}
+
+        setCurrentUser((prev) => {
+          if (!prev) return null;
+          const updatedSelf = cloudUsers.find(
+            (u) => u.username.toLowerCase() === prev.username.toLowerCase()
+          );
+          if (updatedSelf) {
+            const merged: UserAccount = {
+              ...prev,
+              ...updatedSelf,
+              name: updatedSelf.name || prev.name || prev.username || 'ผู้ใช้งาน',
+              role: updatedSelf.role || prev.role || 'employee',
+            };
+            try {
+              localStorage.setItem('meeting_app_sso_user', JSON.stringify(merged));
+            } catch (_) {}
+            return merged;
+          }
+          return prev;
+        });
       }
     });
 
@@ -817,7 +846,7 @@ export default function App() {
         setBookings((prev) => [newBooking, ...prev.filter((b) => b.id !== newBooking.id)]);
 
         // Trigger Email Notification (RECEIVED)
-        const newMails = createEmailNotifications(newBooking, 'RECEIVED', rooms);
+        const newMails = createEmailNotifications(newBooking, 'RECEIVED', rooms, undefined, users);
         setEmailNotifications((prev) => [...newMails, ...prev]);
 
         showToast(`ส่งคำขอจองเรียบร้อย รหัส ${newBooking.id} (รอการอนุมัติและส่งอีเมลแจ้งเตือนแล้ว)`, 'success');
@@ -863,7 +892,7 @@ export default function App() {
     updateBookingInFirestore(targetId, { status: 'approved' }).catch(console.warn);
 
     // Send email notification (APPROVED)
-    const newMails = createEmailNotifications(updated, 'APPROVED', rooms);
+    const newMails = createEmailNotifications(updated, 'APPROVED', rooms, undefined, users);
     setEmailNotifications((prev) => [...newMails, ...prev]);
 
     showToast(`อนุมัติการจอง "${target.topic}" เรียบร้อยแล้ว พร้อมส่งอีเมลแจ้งเตือน`, 'success');
@@ -893,7 +922,7 @@ export default function App() {
     updateBookingInFirestore(target.id, { status: 'rejected', rejectionReason: reason }).catch(console.warn);
 
     // Send email notification (REJECTED)
-    const newMails = createEmailNotifications(updated, 'REJECTED', rooms, reason);
+    const newMails = createEmailNotifications(updated, 'REJECTED', rooms, reason, users);
     setEmailNotifications((prev) => [...newMails, ...prev]);
 
     showToast(`ปฏิเสธคำขอจอง "${target.topic}" เรียบร้อยแล้ว พร้อมส่งอีเมลแจ้งเหตุผล`, 'info');
@@ -907,6 +936,11 @@ export default function App() {
   const handleCancelBooking = async (bookingId: string, reason: string) => {
     const b = bookings.find((item) => item.id === bookingId);
     if (!b) throw new Error('ไม่พบข้อมูลการจอง');
+
+    const isUserAdmin = isAdminMode || currentUser?.role === 'admin' || currentUser?.role === 'manager';
+    if (!isUserAdmin && isBookingInPast(b)) {
+      throw new Error('บัญชี User ไม่สามารถยกเลิกการจองในวันที่และเวลาที่ผ่านมาแล้วได้');
+    }
 
     const updated: Booking = {
       ...b,
@@ -923,7 +957,7 @@ export default function App() {
     }).catch(console.warn);
 
     // Trigger CANCELLED email
-    const newMails = createEmailNotifications(updated, 'CANCELLED', rooms, reason);
+    const newMails = createEmailNotifications(updated, 'CANCELLED', rooms, reason, users);
     setEmailNotifications((prev) => [...newMails, ...prev]);
 
     setIsCancelModalOpen(false);
@@ -943,7 +977,7 @@ export default function App() {
   const handleConfirmResend = () => {
     if (!targetResendBooking) return;
     const emailType = targetResendBooking.status === 'pending' ? 'RECEIVED' : 'APPROVED';
-    const newMails = createEmailNotifications(targetResendBooking, emailType, rooms);
+    const newMails = createEmailNotifications(targetResendBooking, emailType, rooms, undefined, users);
     setEmailNotifications((prev) => [...newMails, ...prev]);
     showToast(`ส่งอีเมลแจ้งเตือนซ้ำให้ ${targetResendBooking.email} เรียบร้อยแล้ว`, 'success');
   };
@@ -1128,20 +1162,17 @@ export default function App() {
     const approvedAt = new Date().toISOString();
     const approvedBy = currentUser?.name || 'ผู้ดูแลระบบ';
 
+    const updatedUser: UserAccount = {
+      ...target,
+      status: 'approved',
+      approvedAt,
+      approvedBy
+    };
+
     setUsers((prev) =>
-      prev.map((u) =>
-        u.username === username
-          ? {
-              ...u,
-              status: 'approved',
-              approvedAt,
-              approvedBy
-            }
-          : u
-      )
+      prev.map((u) => (u.username === username ? updatedUser : u))
     );
-    const targetId = target.id || target.username;
-    updateUserInFirestore(targetId, { status: 'approved', approvedAt, approvedBy }).catch(console.warn);
+    saveUserToFirestore(updatedUser).catch(console.warn);
 
     // Create system notification email for the approved user
     const approvalEmail: EmailNotification = {
@@ -1171,22 +1202,18 @@ export default function App() {
 
   const handleRejectUser = (username: string, reason?: string) => {
     const target = users.find((u) => u.username === username);
+    if (!target) return;
     const rejectionReason = reason || 'ข้อมูลไม่ผ่านเกณฑ์การอนุมัติ';
+    const updatedUser: UserAccount = {
+      ...target,
+      status: 'rejected',
+      rejectionReason
+    };
     setUsers((prev) =>
-      prev.map((u) =>
-        u.username === username
-          ? {
-              ...u,
-              status: 'rejected',
-              rejectionReason
-            }
-          : u
-      )
+      prev.map((u) => (u.username === username ? updatedUser : u))
     );
-    if (target) {
-      updateUserInFirestore(target.id || target.username, { status: 'rejected', rejectionReason }).catch(console.warn);
-    }
-    showToast(`ปฏิเสธคำขอสมัครของ "${username}" เรียบร้อยแล้ว`, 'info');
+    saveUserToFirestore(updatedUser).catch(console.warn);
+    showToast(`ปฏิเสธคำขอสมัครของ "${target.name || username}" เรียบร้อยแล้ว`, 'info');
   };
 
   const handleDeleteUser = (username: string) => {
@@ -1221,13 +1248,40 @@ export default function App() {
 
   const handleUpdateUserRole = (username: string, role: UserRole) => {
     const target = users.find((u) => u.username === username);
+    if (!target) return;
+
+    const avatarColor =
+      role === 'admin'
+        ? 'bg-purple-600'
+        : role === 'manager'
+        ? 'bg-blue-600'
+        : 'bg-emerald-600';
+
+    const updatedUser: UserAccount = {
+      ...target,
+      role,
+      avatarColor: target.avatarColor || avatarColor,
+      receiveEmailNotifications:
+        role === 'admin' || role === 'manager'
+          ? (target.receiveEmailNotifications !== false)
+          : undefined,
+    };
+
     setUsers((prev) =>
-      prev.map((u) => (u.username === username ? { ...u, role } : u))
+      prev.map((u) => (u.username === username ? updatedUser : u))
     );
-    if (target) {
-      updateUserInFirestore(target.id || target.username, { role }).catch(console.warn);
+
+    saveUserToFirestore(updatedUser).catch(console.warn);
+
+    if (currentUser?.username === username) {
+      setCurrentUser(updatedUser);
+      try {
+        localStorage.setItem('meeting_app_sso_user', JSON.stringify(updatedUser));
+      } catch (_) {}
     }
-    showToast(`ปรับระดับสิทธิ์ของ "${username}" เป็น ${role.toUpperCase()} เรียบร้อยแล้ว`, 'success');
+
+    const roleName = role === 'admin' ? 'Super Admin' : role === 'manager' ? 'Admin' : 'User';
+    showToast(`ปรับระดับสิทธิ์ของ "${target.name || username}" เป็น ${roleName} เรียบร้อยแล้ว`, 'success');
   };
 
   const handleUpdateUser = (updatedUser: UserAccount) => {
@@ -1458,6 +1512,11 @@ export default function App() {
               setIsDetailModalOpen(true);
             }}
             onRequestCancel={(b) => {
+              const isUserAdmin = isAdminMode || currentUser?.role === 'admin' || currentUser?.role === 'manager';
+              if (!isUserAdmin && isBookingInPast(b)) {
+                showToast('บัญชี User ไม่สามารถยกเลิกการจองในวันที่และเวลาที่ผ่านมาแล้วได้', 'error');
+                return;
+              }
               setTargetCancelBooking(b);
               setIsCancelModalOpen(true);
             }}
@@ -1609,6 +1668,11 @@ export default function App() {
         onApprove={handleApprove}
         onReject={handleRejectClick}
         onCancelClick={(b) => {
+          const isUserAdmin = isAdminMode || currentUser?.role === 'admin' || currentUser?.role === 'manager';
+          if (!isUserAdmin && isBookingInPast(b)) {
+            showToast('บัญชี User ไม่สามารถยกเลิกการจองในวันที่และเวลาที่ผ่านมาแล้วได้', 'error');
+            return;
+          }
           setTargetCancelBooking(b);
           setIsCancelModalOpen(true);
         }}

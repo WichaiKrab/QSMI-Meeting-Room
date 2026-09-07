@@ -183,12 +183,12 @@ export const MyProfileTab: React.FC<MyProfileTabProps> = ({
               <div
                 className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center text-white font-extrabold text-2xl sm:text-3xl shadow-md shrink-0 ring-4 ring-white/10 ${avatarColor}`}
               >
-                {name ? name.charAt(0) : currentUser.username.charAt(0).toUpperCase()}
+                {(name || currentUser?.name || currentUser?.username || 'U').charAt(0).toUpperCase()}
               </div>
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h4 className="text-lg sm:text-xl font-bold truncate text-white">{name || currentUser.name}</h4>
+                  <h4 className="text-lg sm:text-xl font-bold truncate text-white">{name || currentUser?.name || currentUser?.username || 'ผู้ใช้งาน'}</h4>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
                     <CheckCircle2 size={10} /> บัญชีได้รับการอนุมัติแล้ว
                   </span>

@@ -68,6 +68,7 @@ export interface UserAccount {
   approvedAt?: string;
   approvedBy?: string;
   rejectionReason?: string;
+  receiveEmailNotifications?: boolean;
 }
 
 export interface EmailNotification {

@@ -20,13 +20,14 @@ import {
   X
 } from 'lucide-react';
 import { Booking, Room, UserAccount } from '../types';
-import { formatThaiDate, formatThaiTime } from '../utils/thaiDate';
+import { formatThaiDate, formatThaiTime, isBookingInPast } from '../utils/thaiDate';
 import { generateGoogleCalendarUrl, downloadIcsFile } from '../utils/calendarSync';
 
 interface MyBookingsTabProps {
   bookings: Booking[];
   rooms: Room[];
   currentUser: UserAccount | null;
+  isAdminMode?: boolean;
   onViewBooking: (booking: Booking) => void;
   onRequestCancel: (booking: Booking) => void;
   onOpenNewBooking?: () => void;
@@ -36,6 +37,7 @@ export const MyBookingsTab: React.FC<MyBookingsTabProps> = ({
   bookings,
   rooms,
   currentUser,
+  isAdminMode = false,
   onViewBooking,
   onRequestCancel,
   onOpenNewBooking
@@ -170,7 +172,7 @@ export const MyBookingsTab: React.FC<MyBookingsTabProps> = ({
                 currentUser?.avatarColor || 'bg-red-600'
               }`}
             >
-              {currentUser ? currentUser.name.charAt(0) : 'U'}
+              {(currentUser?.name || currentUser?.username || 'U').charAt(0)}
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -410,6 +412,8 @@ export const MyBookingsTab: React.FC<MyBookingsTabProps> = ({
             const isApproved = b.status === 'approved';
             const isCancelled = b.status === 'cancelled';
             const isRejected = b.status === 'rejected';
+            const isPast = isBookingInPast(b);
+            const isUserAdmin = isAdminMode || currentUser?.role === 'admin' || currentUser?.role === 'manager';
 
             const googleCalUrl = isApproved ? generateGoogleCalendarUrl(b, room) : '';
 
@@ -588,14 +592,24 @@ export const MyBookingsTab: React.FC<MyBookingsTabProps> = ({
 
                     {/* Cancel Booking Action */}
                     {(isPending || isApproved) && (
-                      <button
-                        type="button"
-                        onClick={() => onRequestCancel(b)}
-                        className="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold transition flex items-center gap-1.5 border border-red-200 shadow-2xs active:scale-95 ml-auto"
-                      >
-                        <Ban size={14} />
-                        <span>ยกเลิกการจอง</span>
-                      </button>
+                      isPast && !isUserAdmin ? (
+                        <div
+                          className="px-3 py-1.5 rounded-xl bg-gray-100 text-gray-500 text-xs font-medium border border-gray-200 flex items-center gap-1.5 ml-auto cursor-not-allowed select-none"
+                          title="บัญชี User ไม่สามารถยกเลิกการจองในวันที่และเวลาที่ผ่านมาแล้วได้"
+                        >
+                          <Clock size={13} className="text-gray-400" />
+                          <span>พ้นกำหนดเวลา (ไม่สามารถยกเลิกได้)</span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => onRequestCancel(b)}
+                          className="px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold transition flex items-center gap-1.5 border border-red-200 shadow-2xs active:scale-95 ml-auto"
+                        >
+                          <Ban size={14} />
+                          <span>ยกเลิกการจอง</span>
+                        </button>
+                      )
                     )}
                   </div>
                 </div>

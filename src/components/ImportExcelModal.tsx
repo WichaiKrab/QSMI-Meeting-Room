@@ -2,7 +2,6 @@ import React, { useState, useRef } from 'react';
 import {
   X,
   FileSpreadsheet,
-  Download,
   UploadCloud,
   CheckCircle2,
   AlertTriangle,
@@ -19,7 +18,6 @@ import {
 } from 'lucide-react';
 import { Booking, Room } from '../types';
 import {
-  downloadBookingTemplate,
   downloadBookingCsvTemplate,
   parseAndValidateImportFile,
   ImportValidationResult
@@ -45,7 +43,6 @@ export const ImportExcelModal: React.FC<ImportExcelModalProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
-  const [isDownloadingXlsx, setIsDownloadingXlsx] = useState(false);
   const [isDownloadingCsv, setIsDownloadingCsv] = useState(false);
   const [downloadSuccessMsg, setDownloadSuccessMsg] = useState<string | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -57,20 +54,6 @@ export const ImportExcelModal: React.FC<ImportExcelModalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleDownloadXlsx = () => {
-    setIsDownloadingXlsx(true);
-    setDownloadSuccessMsg(null);
-    try {
-      downloadBookingTemplate(rooms);
-      setDownloadSuccessMsg('ดาวน์โหลดไฟล์ Template (.xlsx) สำเร็จแล้ว');
-      setTimeout(() => setDownloadSuccessMsg(null), 5000);
-    } catch (err: any) {
-      alert(`ไม่สามารถดาวน์โหลดไฟล์ได้: ${err?.message || 'ข้อผิดพลาดระบบ'}`);
-    } finally {
-      setIsDownloadingXlsx(false);
-    }
-  };
 
   const handleDownloadCsv = () => {
     setIsDownloadingCsv(true);
@@ -220,44 +203,29 @@ export const ImportExcelModal: React.FC<ImportExcelModalProps> = ({
                 </div>
                 <div className="space-y-0.5">
                   <h4 className="text-xs sm:text-sm font-bold text-emerald-950">
-                    ดาวน์โหลดแบบฟอร์มต้นแบบ (Excel Template)
+                    ดาวน์โหลดแบบฟอร์มต้นแบบ (Template .csv)
                   </h4>
                   <p className="text-xs text-emerald-800 leading-relaxed">
-                    ดาวน์โหลดไฟล์มาตรฐานที่มีหัวตารางและแถวตัวอย่าง พร้อมชีทรายชื่อห้องประชุมที่มีในระบบ
+                    ดาวน์โหลดไฟล์เทมเพลตมาตรฐาน (.csv) พร้อมเปิดแก้ไขด้วย Microsoft Excel ได้ทันทีโดยภาษาไทยไม่เพี้ยน
                   </p>
                 </div>
               </div>
 
-              {/* Action Buttons for Download */}
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={handleDownloadXlsx}
-                  disabled={isDownloadingXlsx}
-                  title="ดาวน์โหลดไฟล์ Microsoft Excel (.xlsx)"
-                  className="flex items-center gap-2 px-3.5 py-2.5 bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
-                >
-                  {isDownloadingXlsx ? (
-                    <RefreshCw size={14} className="animate-spin" />
-                  ) : (
-                    <Download size={14} />
-                  )}
-                  <span>ดาวน์โหลด Template (.xlsx)</span>
-                </button>
-
+              {/* Action Button for Download (CSV only) */}
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={handleDownloadCsv}
                   disabled={isDownloadingCsv}
-                  title="ดาวน์โหลดไฟล์ CSV สำหรับเปิดด้วยโปรแกรมทั่วไป (.csv)"
-                  className="flex items-center gap-1.5 px-3 py-2.5 bg-white hover:bg-emerald-100 active:scale-95 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-bold transition shadow-2xs cursor-pointer"
+                  title="ดาวน์โหลดไฟล์ Template (.csv) สำหรับเปิดด้วย Microsoft Excel"
+                  className="flex items-center gap-2 px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
                 >
                   {isDownloadingCsv ? (
-                    <RefreshCw size={14} className="animate-spin text-emerald-700" />
+                    <RefreshCw size={14} className="animate-spin" />
                   ) : (
-                    <FileDown size={14} className="text-emerald-700" />
+                    <FileDown size={15} />
                   )}
-                  <span>Template (.csv)</span>
+                  <span>ดาวน์โหลด Template (.csv)</span>
                 </button>
               </div>
             </div>

@@ -244,3 +244,14 @@ export const checkAdjacentBookings = (
   };
 };
 
+/**
+ * ตรวจสอบว่าการจองอยู่ในวันและเวลาที่ผ่านมาแล้วหรือไม่
+ * ถือว่าผ่านไปแล้วหากเวลาเริ่มต้นการจอง (startTime) ถึงหรือล่วงเลยเวลาปัจจุบัน
+ */
+export const isBookingInPast = (booking?: { startTime?: string; endTime?: string } | null): boolean => {
+  if (!booking?.startTime) return false;
+  const start = new Date(booking.startTime).getTime();
+  if (isNaN(start)) return false;
+  return start <= Date.now();
+};
+

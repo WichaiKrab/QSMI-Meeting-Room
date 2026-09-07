@@ -10,7 +10,7 @@ import {
   orderBy
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { Room, Booking, UserAccount, Department, EmailNotification } from '../types';
+import { Room, Booking, UserAccount, Department, EmailNotification, UserRole } from '../types';
 import {
   INITIAL_ROOMS,
   INITIAL_BOOKINGS,
@@ -91,8 +91,54 @@ export function subscribeToBookings(callback: (bookings: Booking[]) => void) {
 export function subscribeToUsers(callback: (users: UserAccount[]) => void) {
   const q = collection(db, USERS_COL);
   return onSnapshot(q, (snapshot) => {
-    const items: UserAccount[] = [];
-    snapshot.forEach((docSnap) => items.push(docSnap.data() as UserAccount));
+    const userMap = new Map<string, UserAccount>();
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data() as Partial<UserAccount>;
+      if (!data) return;
+
+      const rawUsername = data.username || docSnap.id || '';
+      const username = rawUsername.trim();
+      if (!username) return;
+
+      const lowerUser = username.toLowerCase();
+      const existing = userMap.get(lowerUser);
+
+      const resolvedRole = (data.role || existing?.role || 'employee') as UserRole;
+      const resolvedName = (data.name || existing?.name || username || 'ผู้ใช้งาน').trim();
+
+      const mergedUser: UserAccount = {
+        id: data.id || docSnap.id || existing?.id || lowerUser,
+        username: username,
+        name: resolvedName,
+        department: data.department || existing?.department || 'ทั่วไป',
+        title: data.title || existing?.title || '',
+        role: resolvedRole,
+        status: (data.status || existing?.status || 'approved') as 'approved' | 'pending' | 'rejected',
+        password: data.password || existing?.password || '1234',
+        email: data.email || existing?.email || '',
+        phone: data.phone || existing?.phone || '',
+        avatarColor:
+          data.avatarColor ||
+          existing?.avatarColor ||
+          (resolvedRole === 'admin'
+            ? 'bg-purple-600'
+            : resolvedRole === 'manager'
+            ? 'bg-blue-600'
+            : 'bg-emerald-600'),
+        receiveEmailNotifications:
+          data.receiveEmailNotifications !== undefined
+            ? data.receiveEmailNotifications
+            : existing?.receiveEmailNotifications !== undefined
+            ? existing.receiveEmailNotifications
+            : true,
+      };
+
+      userMap.set(lowerUser, mergedUser);
+    });
+
+    const items = Array.from(userMap.values()).filter(
+      (u) => Boolean(u && u.username && u.name)
+    );
     callback(items);
   }, (err) => {
     console.warn('Users subscription error:', err);
@@ -254,7 +300,16 @@ export async function deleteRoomFromFirestore(roomId: string) {
 // Users
 export async function saveUserToFirestore(user: UserAccount) {
   const id = user.id || user.username;
-  await setDoc(doc(db, USERS_COL, id), { ...user, id }, { merge: true });
+  const sanitizedUser: UserAccount = {
+    ...user,
+    id,
+    username: user.username,
+    name: user.name || user.username || 'ผู้ใช้งาน',
+    department: user.department || 'ทั่วไป',
+    role: user.role || 'employee',
+    status: user.status || 'approved',
+  };
+  await setDoc(doc(db, USERS_COL, id), sanitizedUser, { merge: true });
 }
 
 export async function updateUserInFirestore(userId: string, updates: Partial<UserAccount>) {

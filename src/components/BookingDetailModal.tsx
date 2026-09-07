@@ -18,7 +18,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { Room, Booking, UserAccount } from '../types';
-import { formatThaiDate, formatThaiTime } from '../utils/thaiDate';
+import { formatThaiDate, formatThaiTime, isBookingInPast } from '../utils/thaiDate';
 import { generateGoogleCalendarUrl, downloadIcsFile } from '../utils/calendarSync';
 import { normalizeEquipmentName, normalizeSeatingName } from '../data/initialData';
 
@@ -110,17 +110,26 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
     (isAdminMode ||
       (currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager')));
 
-  // Determine if current user can cancel: Super Admin, Admin, creator, or department member
+  const isPast = isBookingInPast(booking);
+  const isUserAdmin =
+    isAdminMode ||
+    (currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager'));
+
+  // Determine if current user can cancel:
+  // - Super Admin / Admin can cancel any booking.
+  // - User account (employee / creator) can ONLY cancel if the booking date & time has NOT passed.
+  const isBookingOwner = Boolean(
+    currentUser &&
+      ((booking.username && currentUser.username?.toLowerCase() === booking.username.toLowerCase()) ||
+        currentUser.department === booking.department ||
+        currentUser.name === booking.requesterName)
+  );
+
   const canCancel =
     !isBlocked &&
     !isCancelled &&
     !isRejected &&
-    (isAdminMode ||
-      (currentUser &&
-        (currentUser.role === 'admin' ||
-          currentUser.role === 'manager' ||
-          currentUser.department === booking.department ||
-          currentUser.name === booking.requesterName)));
+    (isUserAdmin || (!isPast && isBookingOwner));
 
   return (
     <div
@@ -417,6 +426,14 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
             >
               <X size={15} /> ยกเลิกการจองห้องนี้
             </button>
+          )}
+
+          {/* Past Booking Notice for Regular Users */}
+          {!canCancel && isPast && !isUserAdmin && (isPending || isApproved) && isBookingOwner && (
+            <div className="w-full p-2.5 bg-gray-100 rounded-xl border border-gray-200 text-gray-500 text-xs flex items-center justify-center gap-2">
+              <Clock size={14} className="text-gray-400 shrink-0" />
+              <span>พ้นกำหนดวันและเวลาแล้ว บัญชี User ไม่สามารถยกเลิกการจองย้อนหลังได้</span>
+            </div>
           )}
 
           {/* Admin Delete Booking Permanently */}

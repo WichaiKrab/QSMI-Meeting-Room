@@ -222,7 +222,7 @@ export const Header: React.FC<HeaderProps> = ({
                       currentUser.avatarColor || 'bg-red-600'
                     }`}
                   >
-                    {currentUser.name.charAt(0)}
+                    {(currentUser.name || currentUser.username || 'U').charAt(0)}
                   </div>
                   {/* Notification badge on mobile avatar if pending items exist */}
                   {(totalPendingBadge > 0 || myBookingsCount > 0) && (
@@ -231,7 +231,9 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
 
                 <div className="hidden sm:block text-left leading-tight max-w-[100px] md:max-w-[130px] truncate">
-                  <div className="font-bold text-gray-900 truncate text-xs">{currentUser.name}</div>
+                  <div className="font-bold text-gray-900 truncate text-xs">
+                    {currentUser.name || currentUser.username || 'ผู้ใช้งาน'}
+                  </div>
                   <div className="text-[10px] text-gray-500 font-semibold truncate">
                     {currentUser.role === 'admin' ? (
                       <span className="text-purple-700">Super Admin</span>
@@ -269,11 +271,11 @@ export const Header: React.FC<HeaderProps> = ({
                         currentUser.avatarColor || 'bg-red-600'
                       }`}
                     >
-                      {currentUser.name.charAt(0)}
+                      {(currentUser.name || currentUser.username || 'U').charAt(0)}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="font-bold text-gray-900 text-sm truncate">
-                        {currentUser.name}
+                        {currentUser.name || currentUser.username || 'ผู้ใช้งาน'}
                       </div>
                       <div className="text-xs text-gray-500 truncate mt-0.5">
                         {currentUser.department || currentUser.username}
