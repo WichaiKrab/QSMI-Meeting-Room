@@ -190,7 +190,7 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
                   ? 'ลงทะเบียนสมัครใช้งานระบบ'
                   : activeMode === 'register_success'
                   ? 'ส่งคำขอลงทะเบียนสำเร็จ'
-                  : 'เข้าสู่ระบบ (SSO Login)'}
+                  : 'เข้าสู่ระบบ (Login)'}
               </h2>
               <p className="text-xs text-gray-500">
                 {activeMode === 'register'
