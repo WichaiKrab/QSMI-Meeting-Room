@@ -51,6 +51,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
 
   const handleToday = () => {
     onChangeDate(new Date());
+    onChangeViewMode('day');
   };
 
   const now = new Date();
