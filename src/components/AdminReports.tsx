@@ -99,16 +99,19 @@ export const AdminReports: React.FC<AdminReportsProps> = ({ bookings, rooms }) =
       if (start && end) {
         if (bDate < start || bDate > end) return;
       }
-      if (!dataMap[b.roomId]) return;
+      if (!dataMap[b.roomId]) {
+        dataMap[b.roomId] = { name: 'ห้องเดิม (ถูกลบ)' };
+      }
       const deptName = b.department || 'ไม่ระบุ';
       depts.add(deptName);
       if (!dataMap[b.roomId][deptName]) dataMap[b.roomId][deptName] = 0;
       dataMap[b.roomId][deptName] += 1;
     });
 
-    const sortedData = rooms.map((r) => dataMap[r.id]).filter(Boolean);
+    // Ensure the order of rooms matches Chart 1 (roomStats) exactly
+    const sortedData = roomStats.map((r) => dataMap[r.id]).filter(Boolean);
     return { data: sortedData, departments: Array.from(depts) };
-  }, [bookings, rooms, startDate, endDate]);
+  }, [bookings, rooms, startDate, endDate, roomStats]);
 
   // 3. Stat: Department usage aggregated table
   const deptTableData = useMemo(() => {
@@ -399,10 +402,14 @@ export const AdminReports: React.FC<AdminReportsProps> = ({ bookings, rooms }) =
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip
                 contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}
-                formatter={(val: any, name: string) => [
-                  name === 'count' ? `${val} ครั้ง` : `${Number(val).toLocaleString()} คน`,
-                  name === 'count' ? 'จำนวนครั้ง' : 'จำนวนคน'
-                ]}
+                formatter={(val: any, name: any, item: any) => {
+                  const dataKey = item?.dataKey || '';
+                  const isCount = dataKey === 'count' || name === 'จำนวนครั้ง' || name === 'count';
+                  if (isCount) {
+                    return [`${Number(val).toLocaleString()} ครั้ง`, 'จำนวนครั้ง'];
+                  }
+                  return [`${Number(val).toLocaleString()} คน`, 'จำนวนคน'];
+                }}
               />
               <Legend verticalAlign="top" height={36} />
               <Bar dataKey="count" name="จำนวนครั้ง" fill="#C8102E" radius={[6, 6, 0, 0]} />
@@ -427,6 +434,7 @@ export const AdminReports: React.FC<AdminReportsProps> = ({ bookings, rooms }) =
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip
                 contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}
+                formatter={(val: any, name: any) => [`${Number(val).toLocaleString()} ครั้ง`, name]}
               />
               <Legend verticalAlign="top" height={36} wrapperStyle={{ overflowX: 'auto', maxWidth: '100%' }} />
               {deptStats.departments.map((dept, index) => (
