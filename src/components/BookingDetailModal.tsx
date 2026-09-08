@@ -15,7 +15,8 @@ import {
   Download,
   Send,
   ExternalLink,
-  Trash2
+  Trash2,
+  Edit3
 } from 'lucide-react';
 import { Room, Booking, UserAccount } from '../types';
 import { formatThaiDate, formatThaiTime, isBookingInPast } from '../utils/thaiDate';
@@ -32,6 +33,7 @@ interface BookingDetailModalProps {
   currentUser: UserAccount | null;
   onApprove?: (booking: Booking) => void;
   onReject?: (booking: Booking) => void;
+  onEditClick?: (booking: Booking) => void;
   onCancelClick?: (booking: Booking) => void;
   onResendEmail?: (booking: Booking) => void;
   onDeleteClick?: (booking: Booking) => void;
@@ -47,6 +49,7 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
   currentUser,
   onApprove,
   onReject,
+  onEditClick,
   onCancelClick,
   onResendEmail,
   onDeleteClick,
@@ -127,6 +130,12 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
   );
 
   const canCancel =
+    !isBlocked &&
+    !isCancelled &&
+    !isRejected &&
+    (isUserAdmin || (!isPast && isBookingOwner));
+
+  const canEdit =
     !isBlocked &&
     !isCancelled &&
     !isRejected &&
@@ -402,6 +411,20 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
                 <Ban size={16} /> ปฏิเสธการจอง
               </button>
             </div>
+          )}
+
+          {/* Edit Booking Button (Admin/Manager or Booking Owner) */}
+          {canEdit && onEditClick && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onEditClick(booking);
+              }}
+              className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition text-xs sm:text-sm shadow-xs flex items-center justify-center gap-1.5 active:scale-95"
+            >
+              <Edit3 size={15} /> แก้ไขข้อมูลการจองห้องประชุม
+            </button>
           )}
 
           {/* Resend Confirmation Email - Admin & Manager ONLY */}

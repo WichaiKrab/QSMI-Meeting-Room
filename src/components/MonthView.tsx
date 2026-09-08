@@ -188,8 +188,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
                         key={b.id}
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (isAdminMode && onEditBooking) onEditBooking(b);
-                          else onViewBooking(b);
+                          onViewBooking(b);
                         }}
                         className={`text-[11px] p-1 px-1.5 rounded-lg border truncate cursor-pointer transition font-medium flex items-center gap-1 leading-tight ${pillClass}`}
                         title={`${timeText} ${room ? `[${room.name}]` : ''} ${b.topic}`}
@@ -329,8 +328,7 @@ export const MonthView: React.FC<MonthViewProps> = ({
                 <div
                   key={b.id}
                   onClick={() => {
-                    if (isAdminMode && onEditBooking) onEditBooking(b);
-                    else onViewBooking(b);
+                    onViewBooking(b);
                   }}
                   className={`p-3 rounded-xl border transition cursor-pointer hover:shadow-xs flex flex-col justify-between gap-2 ${
                     isPending ? 'bg-amber-50/70 border-amber-200' : 'bg-blue-50/40 border-blue-200'

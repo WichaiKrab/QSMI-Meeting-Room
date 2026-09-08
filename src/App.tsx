@@ -1716,6 +1716,13 @@ export default function App() {
         currentUser={currentUser}
         onApprove={handleApprove}
         onReject={handleRejectClick}
+        onEditClick={(b) => {
+          setIsDetailModalOpen(false);
+          setViewingBooking(null);
+          setEditingBooking(b);
+          setSelectedSlotRoom(rooms.find((r) => r.id === b.roomId));
+          setIsBookingModalOpen(true);
+        }}
         onCancelClick={(b) => {
           const isUserAdmin = isAdminMode || currentUser?.role === 'admin' || currentUser?.role === 'manager';
           if (!isUserAdmin && isBookingInPast(b)) {

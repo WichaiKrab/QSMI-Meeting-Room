@@ -398,8 +398,7 @@ export const DayView: React.FC<DayViewProps> = ({
                     title={`${booking.topic} โดย ${booking.requesterName} (${isPending ? 'รออนุมัติ' : 'ยืนยัน'})`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (isAdminMode && onEditBooking) onEditBooking(booking);
-                      else onViewBooking(booking);
+                      onViewBooking(booking);
                     }}
                   >
                     <div>

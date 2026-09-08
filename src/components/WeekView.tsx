@@ -213,8 +213,7 @@ export const WeekView: React.FC<WeekViewProps> = ({
                       <div
                         key={b.id}
                         onClick={() => {
-                          if (isAdminMode && onEditBooking) onEditBooking(b);
-                          else onViewBooking(b);
+                          onViewBooking(b);
                         }}
                         className={`p-2.5 rounded-xl border transition cursor-pointer hover:bg-gray-50 flex flex-col gap-1 ${
                           isPending
@@ -428,8 +427,7 @@ export const WeekView: React.FC<WeekViewProps> = ({
                         title={`${booking.topic} (${room ? room.name : ''}) โดย ${booking.requesterName}`}
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (isAdminMode && onEditBooking) onEditBooking(booking);
-                          else onViewBooking(booking);
+                          onViewBooking(booking);
                         }}
                       >
                         <div>
