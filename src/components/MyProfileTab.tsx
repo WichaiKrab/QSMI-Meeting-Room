@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { UserAccount, UserRole, Booking, Room } from '../types';
 import { formatThaiDate, formatThaiTime } from '../utils/thaiDate';
+import { formatThaiPhone } from '../utils/phoneUtils';
 
 interface MyProfileTabProps {
   currentUser: UserAccount;
@@ -65,7 +66,7 @@ export const MyProfileTab: React.FC<MyProfileTabProps> = ({
   const [department, setDepartment] = useState(currentUser.department || QSMI_DEPARTMENTS[0]);
   const [title, setTitle] = useState(currentUser.title || '');
   const [email, setEmail] = useState(currentUser.email || '');
-  const [phone, setPhone] = useState(currentUser.phone || '');
+  const [phone, setPhone] = useState(formatThaiPhone(currentUser.phone || '', ''));
   const [avatarColor, setAvatarColor] = useState(currentUser.avatarColor || 'bg-[#C8102E]');
   const [password, setPassword] = useState(currentUser.password || '1234');
   const [confirmPassword, setConfirmPassword] = useState(currentUser.password || '1234');
@@ -79,7 +80,7 @@ export const MyProfileTab: React.FC<MyProfileTabProps> = ({
     setDepartment(currentUser.department || QSMI_DEPARTMENTS[0]);
     setTitle(currentUser.title || '');
     setEmail(currentUser.email || '');
-    setPhone(currentUser.phone || '');
+    setPhone(formatThaiPhone(currentUser.phone || '', ''));
     setAvatarColor(currentUser.avatarColor || 'bg-[#C8102E]');
     setPassword(currentUser.password || '1234');
     setConfirmPassword(currentUser.password || '1234');
@@ -123,7 +124,7 @@ export const MyProfileTab: React.FC<MyProfileTabProps> = ({
       department: department.trim(),
       title: title.trim(),
       email: email.trim(),
-      phone: phone.trim(),
+      phone: formatThaiPhone(phone.trim(), '') || phone.trim(),
       avatarColor,
       password: password || currentUser.password || '1234'
     };
@@ -321,6 +322,7 @@ export const MyProfileTab: React.FC<MyProfileTabProps> = ({
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
+                    onBlur={() => setPhone((prev) => (prev ? formatThaiPhone(prev, '') || prev : ''))}
                     placeholder="02-252-0161 ต่อ 123"
                     className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-xs sm:text-sm font-medium text-gray-900 outline-none focus:ring-2 focus:ring-[#C8102E] focus:bg-white"
                   />

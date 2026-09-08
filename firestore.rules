@@ -43,5 +43,11 @@ service cloud.firestore {
       allow read: if true;
       allow write: if true;
     }
+
+    // User notification state (read/deleted IDs and cleared status per user across devices)
+    match /userNotificationStates/{userId} {
+      allow read: if true;
+      allow write: if true;
+    }
   }
 }

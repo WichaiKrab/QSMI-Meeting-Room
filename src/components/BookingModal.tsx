@@ -27,6 +27,7 @@ import {
   checkAdjacentBookings
 } from '../utils/thaiDate';
 import { DEFAULT_BOOKING_EQUIPMENT, normalizeEquipmentName, normalizeSeatingName } from '../data/initialData';
+import { formatThaiPhone, normalizeThaiPhoneNumber } from '../utils/phoneUtils';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -174,7 +175,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       setName(bookingData.requesterName || currentUser?.name || '');
       setDepartment(bookingData.department || currentUser?.department || '');
       setEmail(bookingData.email || currentUser?.email || (currentUser?.username ? `${currentUser.username}@qsmi.or.th` : ''));
-      setPhone(bookingData.phone || currentUser?.phone || '');
+      setPhone(formatThaiPhone(bookingData.phone || currentUser?.phone || '', ''));
       setParticipants(bookingData.participants || '');
       setInstitute(bookingData.institute || '');
       setHasInstitute(Boolean(bookingData.institute));
@@ -249,7 +250,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       if (currentUser) {
         setName(currentUser.name || '');
         setDepartment(currentUser.department || '');
-        setPhone(currentUser.phone || '');
+        setPhone(formatThaiPhone(currentUser.phone || '', ''));
         setEmail(currentUser.email || (currentUser.username ? `${currentUser.username}@qsmi.or.th` : ''));
       } else {
         setName('');
@@ -342,7 +343,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       requesterName: name.trim(),
       department: department.trim() || 'ฝ่ายบริหารงานทั่วไป',
       email: email.trim(),
-      phone: phone.trim(),
+      phone: formatThaiPhone(phone.trim(), '') || phone.trim(),
       participants: Number(participants),
       institute: hasInstitute ? institute.trim() : '',
       startTime,
@@ -530,16 +531,20 @@ export const BookingModal: React.FC<BookingModalProps> = ({
             {/* Phone & Email */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center gap-1">
-                  <Phone size={12} className="text-gray-400" />
-                  <span>เบอร์โทรศัพท์ (ติดต่อ)</span>
+                <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <Phone size={12} className="text-gray-400" />
+                    <span>เบอร์โทรศัพท์ (ติดต่อ)</span> <span className="text-red-500">*</span>
+                  </span>
+                  <span className="text-[10px] text-gray-400 font-normal">แก้ไข/ใส่เบอร์ต่อได้</span>
                 </label>
                 <input
                   type="text"
-                  readOnly
-                  value={phone || '-'}
-                  tabIndex={-1}
-                  className="w-full p-2.5 bg-gray-100 border border-gray-200 rounded-xl text-xs sm:text-sm font-semibold text-gray-700 cursor-not-allowed select-none outline-none"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  onBlur={() => setPhone((prev) => (prev ? formatThaiPhone(prev, '') || prev : ''))}
+                  placeholder="เช่น 02-252-0161 ต่อ 123"
+                  className="w-full p-2.5 bg-white border border-gray-300 rounded-xl text-xs sm:text-sm font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-[#C8102E] focus:border-transparent transition shadow-xs"
                 />
               </div>
               <div>

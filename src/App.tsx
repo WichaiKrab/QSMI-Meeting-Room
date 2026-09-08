@@ -37,7 +37,9 @@ import {
   saveDepartmentToFirestore,
   updateDepartmentInFirestore,
   deleteDepartmentFromFirestore,
-  saveBookingWithConcurrencyCheck
+  saveBookingWithConcurrencyCheck,
+  subscribeToUserNotificationState,
+  saveUserNotificationStateToFirestore
 } from './lib/firestoreService';
 
 // Components
@@ -497,46 +499,82 @@ export default function App() {
     }
   });
 
-  // Sync readNotificationIds and deletedNotificationIds on currentUser change
+  // Sync readNotificationIds and deletedNotificationIds with Firestore & localStorage
   useEffect(() => {
-    if (currentUser?.username) {
-      try {
-        const savedRead = localStorage.getItem(`meeting_app_read_notifs_${currentUser.username.toLowerCase()}`);
-        setReadNotificationIds(savedRead ? JSON.parse(savedRead) : []);
-        const savedDeleted = localStorage.getItem(`meeting_app_deleted_notifs_${currentUser.username.toLowerCase()}`);
-        setDeletedNotificationIds(savedDeleted ? JSON.parse(savedDeleted) : []);
-      } catch {
-        setReadNotificationIds([]);
-        setDeletedNotificationIds([]);
-      }
-    } else {
+    if (!currentUser?.username) {
       setReadNotificationIds([]);
       setDeletedNotificationIds([]);
+      return;
     }
+
+    const uname = currentUser.username.toLowerCase().trim();
+
+    // 1. Initial hydration from local cache for instant UI rendering
+    try {
+      const savedRead = localStorage.getItem(`meeting_app_read_notifs_${uname}`);
+      if (savedRead) setReadNotificationIds(JSON.parse(savedRead));
+      const savedDeleted = localStorage.getItem(`meeting_app_deleted_notifs_${uname}`);
+      if (savedDeleted) setDeletedNotificationIds(JSON.parse(savedDeleted));
+    } catch (_) {}
+
+    // 2. Real-time subscription to Firestore so changes from any device sync immediately
+    const unsubscribe = subscribeToUserNotificationState(uname, (cloudState) => {
+      if (cloudState) {
+        setReadNotificationIds((prev) => {
+          const merged = Array.from(new Set([...prev, ...(cloudState.readNotificationIds || [])]));
+          try {
+            localStorage.setItem(`meeting_app_read_notifs_${uname}`, JSON.stringify(merged));
+          } catch (_) {}
+          return merged;
+        });
+
+        setDeletedNotificationIds((prev) => {
+          const merged = Array.from(new Set([...prev, ...(cloudState.deletedNotificationIds || [])]));
+          try {
+            localStorage.setItem(`meeting_app_deleted_notifs_${uname}`, JSON.stringify(merged));
+          } catch (_) {}
+          return merged;
+        });
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, [currentUser?.username]);
 
   const handleMarkNotificationsRead = (idsToMark: string[]) => {
     if (!currentUser?.username || idsToMark.length === 0) return;
+    const uname = currentUser.username.toLowerCase().trim();
     setReadNotificationIds((prev) => {
       const combined = Array.from(new Set([...prev, ...idsToMark]));
       try {
-        localStorage.setItem(`meeting_app_read_notifs_${currentUser.username.toLowerCase()}`, JSON.stringify(combined));
+        localStorage.setItem(`meeting_app_read_notifs_${uname}`, JSON.stringify(combined));
       } catch (e) {
-        console.error('Error saving read notifications', e);
+        console.error('Error saving read notifications locally', e);
       }
+      // Persist to Firestore across all devices
+      saveUserNotificationStateToFirestore(uname, { readNotificationIds: combined }).catch((err) => {
+        console.warn('Failed to sync read notifications to Firestore:', err);
+      });
       return combined;
     });
   };
 
   const handleDeleteNotifications = (idsToDelete: string[]) => {
     if (!currentUser?.username || idsToDelete.length === 0) return;
+    const uname = currentUser.username.toLowerCase().trim();
     setDeletedNotificationIds((prev) => {
       const combined = Array.from(new Set([...prev, ...idsToDelete]));
       try {
-        localStorage.setItem(`meeting_app_deleted_notifs_${currentUser.username.toLowerCase()}`, JSON.stringify(combined));
+        localStorage.setItem(`meeting_app_deleted_notifs_${uname}`, JSON.stringify(combined));
       } catch (e) {
-        console.error('Error saving deleted notifications', e);
+        console.error('Error saving deleted notifications locally', e);
       }
+      // Persist to Firestore across all devices
+      saveUserNotificationStateToFirestore(uname, { deletedNotificationIds: combined }).catch((err) => {
+        console.warn('Failed to sync deleted notifications to Firestore:', err);
+      });
       return combined;
     });
     showToast(
@@ -1035,7 +1073,7 @@ export default function App() {
       topic: data.reason || 'ปิดปรับปรุง',
       department: 'ฝ่ายสนับสนุนอาคารและเครื่องจักรกล',
       requesterName: 'ฝ่ายอาคารสถานที่',
-      phone: '022520161',
+      phone: '02-252-0161',
       email: 'facility@qsmi.or.th',
       startTime: start.toISOString(),
       endTime: end.toISOString(),

@@ -21,6 +21,7 @@ import { Room, Booking, UserAccount } from '../types';
 import { formatThaiDate, formatThaiTime, isBookingInPast } from '../utils/thaiDate';
 import { generateGoogleCalendarUrl, downloadIcsFile } from '../utils/calendarSync';
 import { normalizeEquipmentName, normalizeSeatingName } from '../data/initialData';
+import { formatThaiPhone } from '../utils/phoneUtils';
 
 interface BookingDetailModalProps {
   isOpen: boolean;
@@ -209,7 +210,7 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
               </span>
               {booking.phone && (
                 <div className="flex items-center gap-1 text-gray-700">
-                  <Phone size={13} className="text-gray-400" /> {booking.phone}
+                  <Phone size={13} className="text-gray-400" /> {formatThaiPhone(booking.phone)}
                 </div>
               )}
               {booking.email && (

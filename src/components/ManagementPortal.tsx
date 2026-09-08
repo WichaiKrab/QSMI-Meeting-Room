@@ -43,6 +43,7 @@ import {
 } from 'lucide-react';
 import { Booking, Room, UserAccount, UserRole, UserStatus, Department } from '../types';
 import { formatThaiDate, formatThaiTime } from '../utils/thaiDate';
+import { formatThaiPhone, normalizeThaiPhoneNumber } from '../utils/phoneUtils';
 import { exportBookingsToCSV } from '../utils/exportUtils';
 import { AdminReports } from './AdminReports';
 import { MyProfileTab } from './MyProfileTab';
@@ -368,7 +369,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
       title: regTitle.trim() || 'เจ้าหน้าที่',
       role: regRole,
       email: regEmail.trim() || `${regUsername.trim().toLowerCase()}@qsmi.or.th`,
-      phone: regPhone.trim() || '022520161',
+      phone: formatThaiPhone(regPhone.trim() || '022520161', '02-252-0161'),
       status: 'pending',
       registeredAt: new Date().toISOString(),
       avatarColor: regRole === 'manager' ? 'bg-blue-600' : 'bg-teal-600'
@@ -400,7 +401,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
       title: newAdminUserTitle.trim() || 'เจ้าหน้าที่',
       role: newAdminUserRole,
       email: newAdminUserEmail.trim() || `${newAdminUserUsername.trim().toLowerCase()}@qsmi.or.th`,
-      phone: newAdminUserPhone.trim() || '022520161',
+      phone: formatThaiPhone(newAdminUserPhone.trim() || '022520161', '02-252-0161'),
       status: 'approved',
       approvedAt: new Date().toISOString(),
       approvedBy: currentUser?.name || 'Admin',
@@ -434,7 +435,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
     setEditUserRole(u.role);
     setEditUserStatus(u.status || 'approved');
     setEditUserEmail(u.email || '');
-    setEditUserPhone(u.phone || '');
+    setEditUserPhone(formatThaiPhone(u.phone || '', ''));
     setEditUserPassword(u.password || '1234');
     setEditUserReceiveEmail(u.receiveEmailNotifications !== false);
   };
@@ -467,7 +468,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
       role: editUserRole,
       status: editUserStatus,
       email: editUserEmail.trim(),
-      phone: editUserPhone.trim(),
+      phone: formatThaiPhone(editUserPhone.trim(), '') || editUserPhone.trim(),
       password: editUserPassword || editingUser.password || '1234',
       receiveEmailNotifications:
         editUserRole === 'admin' || editUserRole === 'manager'
@@ -1211,7 +1212,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                             </div>
                             <div><strong>ผู้ขอจอง:</strong> {b.requesterName}</div>
                             <div><strong>ฝ่าย:</strong> {b.department}</div>
-                            {b.phone && <div><strong>โทร:</strong> {b.phone}</div>}
+                            {b.phone && <div><strong>โทร:</strong> {formatThaiPhone(b.phone)}</div>}
                           </div>
                         </div>
 
@@ -1370,7 +1371,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                                 )}
                                 {applicant.phone && (
                                   <span className="flex items-center gap-1">
-                                    <Phone size={12} className="text-gray-400" /> {applicant.phone}
+                                    <Phone size={12} className="text-gray-400" /> {formatThaiPhone(applicant.phone)}
                                   </span>
                                 )}
                                 {applicant.registeredAt && (
@@ -1554,7 +1555,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                           {u.phone && (
                             <div className="flex items-center justify-between gap-2">
                               <span className="text-gray-500 font-medium">เบอร์โทร:</span>
-                              <span className="text-gray-700">{u.phone}</span>
+                              <span className="text-gray-700">{formatThaiPhone(u.phone)}</span>
                             </div>
                           )}
                           {u.email && (
@@ -2995,6 +2996,8 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                     type="tel"
                     value={editUserPhone}
                     onChange={(e) => setEditUserPhone(e.target.value)}
+                    onBlur={() => setEditUserPhone((prev) => (prev ? formatThaiPhone(prev, '') || prev : ''))}
+                    placeholder="เช่น 02-252-0161 ต่อ 123"
                     className="w-full p-2 border border-gray-300 rounded-xl text-xs font-medium text-gray-900 outline-none focus:ring-2 focus:ring-blue-600"
                   />
                 </div>

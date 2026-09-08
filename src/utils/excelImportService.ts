@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import { Booking, Room } from '../types';
 import { checkBookingOverlap } from './thaiDate';
+import { formatThaiPhone } from './phoneUtils';
 
 export interface ParsedImportRow {
   rowIndex: number;
@@ -629,7 +630,7 @@ export const parseAndValidateImportFile = async (
     const roomStr = getVal(colIdx.room);
     const requesterName = getVal(colIdx.requesterName);
     const department = getVal(colIdx.department) || 'ฝ่ายบริหารงานทั่วไป';
-    const phone = getVal(colIdx.phone);
+    const phone = formatThaiPhone(getVal(colIdx.phone), '');
     const email = getVal(colIdx.email);
     const institute = getVal(colIdx.institute);
     const rawStartDate = colIdx.startDate >= 0 ? row[colIdx.startDate] : null;

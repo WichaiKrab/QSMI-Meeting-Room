@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { Room, Booking, UserAccount, Department, EmailNotification, UserRole } from '../types';
+import { normalizeThaiPhoneNumber } from '../utils/phoneUtils';
 import {
   INITIAL_ROOMS,
   INITIAL_BOOKINGS,
@@ -24,6 +25,7 @@ const USERS_COL = 'users';
 const DEPTS_COL = 'departments';
 const EMAILS_COL = 'emailNotifications';
 const MAIL_QUEUE_COL = 'mail';
+const USER_NOTIF_STATES_COL = 'userNotificationStates';
 
 // Initialize default data if firestore is empty
 export async function initializeFirestoreDefaults() {
@@ -116,7 +118,7 @@ export function subscribeToUsers(callback: (users: UserAccount[]) => void) {
         status: (data.status || existing?.status || 'approved') as 'approved' | 'pending' | 'rejected',
         password: data.password || existing?.password || '1234',
         email: data.email || existing?.email || '',
-        phone: data.phone || existing?.phone || '',
+        phone: normalizeThaiPhoneNumber(data.phone || existing?.phone || ''),
         avatarColor:
           data.avatarColor ||
           existing?.avatarColor ||
@@ -308,12 +310,17 @@ export async function saveUserToFirestore(user: UserAccount) {
     department: user.department || 'ทั่วไป',
     role: user.role || 'employee',
     status: user.status || 'approved',
+    phone: normalizeThaiPhoneNumber(user.phone || ''),
   };
   await setDoc(doc(db, USERS_COL, id), sanitizedUser, { merge: true });
 }
 
 export async function updateUserInFirestore(userId: string, updates: Partial<UserAccount>) {
-  await setDoc(doc(db, USERS_COL, userId), updates, { merge: true });
+  const cleanUpdates = { ...updates };
+  if (cleanUpdates.phone !== undefined) {
+    cleanUpdates.phone = normalizeThaiPhoneNumber(cleanUpdates.phone);
+  }
+  await setDoc(doc(db, USERS_COL, userId), cleanUpdates, { merge: true });
 }
 
 export async function deleteUserFromFirestore(userId: string) {
@@ -361,3 +368,64 @@ export async function saveEmailNotificationToFirestore(notification: EmailNotifi
     console.warn('Mail queue insert notice:', err);
   }
 }
+
+// ----------------- User Notification States Across Devices -----------------
+export interface UserNotificationState {
+  username: string;
+  readNotificationIds: string[];
+  deletedNotificationIds: string[];
+  lastClearedAt?: string;
+  updatedAt?: string;
+}
+
+export function subscribeToUserNotificationState(
+  username: string,
+  callback: (state: UserNotificationState) => void
+) {
+  if (!username) return () => {};
+  const docId = username.toLowerCase().trim();
+  const docRef = doc(db, USER_NOTIF_STATES_COL, docId);
+  return onSnapshot(docRef, (docSnap) => {
+    if (docSnap.exists()) {
+      const data = docSnap.data() as Partial<UserNotificationState>;
+      callback({
+        username: data.username || username,
+        readNotificationIds: Array.isArray(data.readNotificationIds) ? data.readNotificationIds : [],
+        deletedNotificationIds: Array.isArray(data.deletedNotificationIds) ? data.deletedNotificationIds : [],
+        lastClearedAt: data.lastClearedAt || undefined,
+        updatedAt: data.updatedAt || undefined,
+      });
+    } else {
+      callback({
+        username,
+        readNotificationIds: [],
+        deletedNotificationIds: [],
+      });
+    }
+  }, (err) => {
+    console.warn('Notification state subscription warning:', err);
+  });
+}
+
+export async function saveUserNotificationStateToFirestore(
+  username: string,
+  state: {
+    readNotificationIds?: string[];
+    deletedNotificationIds?: string[];
+    lastClearedAt?: string;
+  }
+) {
+  if (!username) return;
+  const docId = username.toLowerCase().trim();
+  const docRef = doc(db, USER_NOTIF_STATES_COL, docId);
+  await setDoc(
+    docRef,
+    {
+      username: docId,
+      ...state,
+      updatedAt: new Date().toISOString(),
+    },
+    { merge: true }
+  );
+}
+

@@ -279,7 +279,7 @@ export const CORPORATE_USERS: UserAccount[] = [
     title: 'ผู้ดูแลระบบสูงสุด (Super Admin)',
     avatarColor: 'bg-purple-600',
     email: 'Wsritangkum@gmail.com',
-    phone: '0810001122',
+    phone: '081-000-1122',
     status: 'approved',
     receiveEmailNotifications: true
   }

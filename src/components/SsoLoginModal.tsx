@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { UserAccount, UserRole, Department } from '../types';
 import { INITIAL_DEPARTMENTS } from '../data/initialData';
+import { formatThaiPhone } from '../utils/phoneUtils';
 
 interface SsoLoginModalProps {
   isOpen: boolean;
@@ -154,7 +155,7 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
       title: regTitle.trim() || (regRole === 'manager' ? 'ผู้ดูแลระบบ' : 'เจ้าหน้าที่'),
       role: regRole,
       email: regEmail.trim() || `${regUsername.trim().toLowerCase()}@qsmi.or.th`,
-      phone: regPhone.trim() || '022520161',
+      phone: formatThaiPhone(regPhone.trim() || '022520161', '02-252-0161'),
       status: 'pending',
       registeredAt: new Date().toISOString(),
       avatarColor: regRole === 'manager' ? 'bg-blue-600' : 'bg-teal-600'
