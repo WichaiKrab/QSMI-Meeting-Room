@@ -11,7 +11,9 @@ import {
   CheckCircle2,
   Phone,
   Mail,
-  Clock
+  Clock,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { UserAccount, UserRole, Department } from '../types';
 import { INITIAL_DEPARTMENTS } from '../data/initialData';
@@ -25,6 +27,8 @@ interface SsoLoginModalProps {
   onLoginSuccess: (user: UserAccount) => void;
   onRegisterUser: (newUser: UserAccount) => { success: boolean; message?: string };
   reason?: string | null;
+  isMandatory?: boolean;
+  asCard?: boolean;
 }
 
 export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
@@ -34,7 +38,9 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
   departments = [],
   onLoginSuccess,
   onRegisterUser,
-  reason
+  reason,
+  isMandatory = false,
+  asCard = false
 }) => {
   if (!isOpen) return null;
 
@@ -51,6 +57,7 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
   // --- LOGIN STATES ---
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
   // Reset inputs when modal opens or closes
@@ -58,6 +65,9 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
     if (isOpen) {
       setPassword('');
       setError('');
+      setShowPassword(false);
+      setShowRegPassword(false);
+      setShowRegConfirmPassword(false);
     }
   }, [isOpen]);
 
@@ -65,6 +75,8 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
   const [regUsername, setRegUsername] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [showRegConfirmPassword, setShowRegConfirmPassword] = useState(false);
   const [regName, setRegName] = useState('');
   const [regDept, setRegDept] = useState<string>(() => {
     if (departments && departments.length > 0) {
@@ -171,37 +183,32 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
     setActiveMode('register_success');
   };
 
-  return (
-    <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start sm:items-center justify-center z-50 p-3 sm:p-4 pt-6 sm:pt-4 overflow-y-auto custom-scrollbar"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-5 sm:p-6 border-t-4 border-[#C8102E] my-auto animate-fade-in relative">
-        {/* Modal Header */}
-        <div className="flex justify-between items-center pb-3 border-b border-gray-100 mb-4">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-red-100 text-[#C8102E] rounded-2xl">
-              {activeMode === 'register' ? <UserPlus size={22} /> : <ShieldCheck size={22} />}
-            </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-gray-900">
-                {activeMode === 'register'
-                  ? 'ลงทะเบียนสมัครใช้งานระบบ'
-                  : activeMode === 'register_success'
-                  ? 'ส่งคำขอลงทะเบียนสำเร็จ'
-                  : 'เข้าสู่ระบบ (Login)'}
-              </h2>
-              <p className="text-xs text-gray-500">
-                {activeMode === 'register'
-                  ? 'สมัครขอสิทธิ์การใช้งาน (ต้องได้รับการอนุมัติจาก Admin ก่อน)'
-                  : activeMode === 'register_success'
-                  ? 'รอการตรวจสอบและอนุมัติสิทธิ์จากผู้ดูแลระบบ'
-                  : 'ระบบจองห้องประชุม สถานเสาวภา สภากาชาดไทย'}
-              </p>
-            </div>
+  const cardContent = (
+    <div className={`bg-white rounded-3xl shadow-xl w-full max-w-lg p-5 sm:p-6 border-t-4 border-[#C8102E] animate-fade-in relative border border-gray-100 ${!asCard ? 'my-auto shadow-2xl' : ''}`}>
+      {/* Modal Header */}
+      <div className="flex justify-between items-center pb-3 border-b border-gray-100 mb-4">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 bg-red-100 text-[#C8102E] rounded-2xl">
+            {activeMode === 'register' ? <UserPlus size={22} /> : <ShieldCheck size={22} />}
           </div>
+          <div>
+            <h2 className="text-base sm:text-lg font-bold text-gray-900">
+              {activeMode === 'register'
+                ? 'ลงทะเบียนสมัครใช้งานระบบ'
+                : activeMode === 'register_success'
+                ? 'ส่งคำขอลงทะเบียนสำเร็จ'
+                : 'เข้าสู่ระบบ (Login)'}
+            </h2>
+            <p className="text-xs text-gray-500">
+              {activeMode === 'register'
+                ? 'สมัครขอสิทธิ์การใช้งาน (ต้องได้รับการอนุมัติจาก Admin ก่อน)'
+                : activeMode === 'register_success'
+                ? 'รอการตรวจสอบและอนุมัติสิทธิ์จากผู้ดูแลระบบ'
+                : 'ระบบจองห้องประชุม สถานเสาวภา สภากาชาดไทย'}
+            </p>
+          </div>
+        </div>
+        {!isMandatory && !asCard && (
           <button
             type="button"
             onClick={onClose}
@@ -209,7 +216,8 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
           >
             <X size={20} />
           </button>
-        </div>
+        )}
+      </div>
 
         {/* Action Reason Banner (e.g. Prompt to login before booking slot) */}
         {reason && activeMode === 'login' && (
@@ -294,30 +302,41 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
                 </label>
                 <div className="relative">
                   <input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="กรอกรหัสผ่าน"
-                    className="w-full p-2.5 border border-gray-300 rounded-xl text-xs sm:text-sm font-medium text-gray-800 outline-none focus:ring-2 focus:ring-[#C8102E]"
+                    className="w-full p-2.5 pr-10 border border-gray-300 rounded-xl text-xs sm:text-sm font-medium text-gray-800 outline-none focus:ring-2 focus:ring-[#C8102E]"
                   />
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400">
-                    <Lock size={15} />
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    tabIndex={-1}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none transition-colors"
+                    title={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                    aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
               </div>
 
               <div className="pt-2 flex gap-2.5">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs sm:text-sm transition"
-                >
-                  ยกเลิก
-                </button>
+                {!isMandatory && !asCard && (
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs sm:text-sm transition"
+                  >
+                    ยกเลิก
+                  </button>
+                )}
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 bg-[#C8102E] hover:bg-[#a00c24] text-white font-bold rounded-xl text-xs sm:text-sm shadow-xs transition active:scale-95 flex items-center justify-center gap-1.5"
+                  className={`py-2.5 bg-[#C8102E] hover:bg-[#a00c24] text-white font-bold rounded-xl text-xs sm:text-sm shadow-xs transition active:scale-95 flex items-center justify-center gap-1.5 ${
+                    isMandatory || asCard ? 'w-full' : 'flex-1'
+                  }`}
                 >
                   <UserCheck size={16} /> เข้าสู่ระบบ
                 </button>
@@ -392,28 +411,52 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
                 <label className="block text-xs font-bold text-gray-700 mb-1">
                   รหัสผ่าน (Password) <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="password"
-                  required
-                  placeholder="อย่างน้อย 4 ตัวอักษร"
-                  value={regPassword}
-                  onChange={(e) => setRegPassword(e.target.value)}
-                  className="w-full p-2.5 border border-gray-300 rounded-xl text-xs sm:text-sm font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-[#C8102E]"
-                />
+                <div className="relative">
+                  <input
+                    type={showRegPassword ? 'text' : 'password'}
+                    required
+                    placeholder="อย่างน้อย 4 ตัวอักษร"
+                    value={regPassword}
+                    onChange={(e) => setRegPassword(e.target.value)}
+                    className="w-full p-2.5 pr-10 border border-gray-300 rounded-xl text-xs sm:text-sm font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-[#C8102E]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowRegPassword(!showRegPassword)}
+                    tabIndex={-1}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none transition-colors"
+                    title={showRegPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                    aria-label={showRegPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                  >
+                    {showRegPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
                   ยืนยันรหัสผ่าน <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="password"
-                  required
-                  placeholder="กรอกรหัสผ่านซ้ำอีกครั้ง"
-                  value={regConfirmPassword}
-                  onChange={(e) => setRegConfirmPassword(e.target.value)}
-                  className="w-full p-2.5 border border-gray-300 rounded-xl text-xs sm:text-sm font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-[#C8102E]"
-                />
+                <div className="relative">
+                  <input
+                    type={showRegConfirmPassword ? 'text' : 'password'}
+                    required
+                    placeholder="กรอกรหัสผ่านซ้ำอีกครั้ง"
+                    value={regConfirmPassword}
+                    onChange={(e) => setRegConfirmPassword(e.target.value)}
+                    className="w-full p-2.5 pr-10 border border-gray-300 rounded-xl text-xs sm:text-sm font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-[#C8102E]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowRegConfirmPassword(!showRegConfirmPassword)}
+                    tabIndex={-1}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none transition-colors"
+                    title={showRegConfirmPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                    aria-label={showRegConfirmPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                  >
+                    {showRegConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -571,6 +614,20 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
           </div>
         )}
       </div>
+    );
+
+  if (asCard) {
+    return cardContent;
+  }
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start sm:items-center justify-center z-50 p-3 sm:p-4 pt-6 sm:pt-4 overflow-y-auto custom-scrollbar"
+      onClick={(e) => {
+        if (!isMandatory && e.target === e.currentTarget) onClose();
+      }}
+    >
+      {cardContent}
     </div>
   );
 };

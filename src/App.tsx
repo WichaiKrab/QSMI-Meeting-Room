@@ -128,9 +128,9 @@ export default function App() {
 
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
     try {
-      const saved = localStorage.getItem('meeting_app_sso_user');
-      if (saved) {
-        const u = JSON.parse(saved);
+      const sessionUser = sessionStorage.getItem('meeting_app_sso_user');
+      if (sessionUser) {
+        const u = JSON.parse(sessionUser);
         if (u && (!u.status || u.status === 'approved')) return u;
       }
       return null;
@@ -175,13 +175,12 @@ export default function App() {
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     try {
-      const savedAuth = localStorage.getItem('meeting_app_admin_auth');
-      const savedUser = localStorage.getItem('meeting_app_sso_user');
-      if (savedUser) {
-        const u = JSON.parse(savedUser);
+      const sessionUser = sessionStorage.getItem('meeting_app_sso_user');
+      if (sessionUser) {
+        const u = JSON.parse(sessionUser);
         if (u && u.role === 'admin') return true;
       }
-      return savedAuth === 'true';
+      return false;
     } catch {
       return false;
     }
@@ -189,12 +188,12 @@ export default function App() {
 
   const [isAdminMode, setIsAdminMode] = useState<boolean>(() => {
     try {
-      const savedUser = localStorage.getItem('meeting_app_sso_user');
-      if (savedUser) {
-        const u = JSON.parse(savedUser);
+      const sessionUser = sessionStorage.getItem('meeting_app_sso_user');
+      if (sessionUser) {
+        const u = JSON.parse(sessionUser);
         if (u && u.role === 'admin') return true;
       }
-      return localStorage.getItem('meeting_app_admin_auth') === 'true';
+      return false;
     } catch {
       return false;
     }
@@ -220,13 +219,27 @@ export default function App() {
   const [managementInitialTab, setManagementInitialTab] = useState<
     'approvals' | 'users' | 'bookings' | 'my_history' | 'rooms' | 'reports' | 'directory' | 'departments' | 'my_profile'
   >('approvals');
-  const [isSsoModalOpen, setIsSsoModalOpen] = useState(false);
+  const [isSsoModalOpen, setIsSsoModalOpen] = useState<boolean>(() => {
+    try {
+      const sessionUser = sessionStorage.getItem('meeting_app_sso_user');
+      return !sessionUser;
+    } catch {
+      return true;
+    }
+  });
   const [pendingBookingSlot, setPendingBookingSlot] = useState<{
     room: Room;
     time: string;
     date?: Date;
   } | null>(null);
-  const [loginModalReason, setLoginModalReason] = useState<string | null>(null);
+  const [loginModalReason, setLoginModalReason] = useState<string | null>(() => {
+    try {
+      const sessionUser = sessionStorage.getItem('meeting_app_sso_user');
+      return !sessionUser ? 'เข้าสู่ระบบเพื่อเข้าสู่ระบบจัดการข้อมูลและสิทธิ์' : null;
+    } catch {
+      return 'เข้าสู่ระบบเพื่อเข้าสู่ระบบจัดการข้อมูลและสิทธิ์';
+    }
+  });
   const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState(false);
   const [isGuideModalOpen, setIsGuideModalOpen] = useState(false);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
@@ -367,8 +380,10 @@ export default function App() {
   useEffect(() => {
     try {
       if (currentUser) {
+        sessionStorage.setItem('meeting_app_sso_user', JSON.stringify(currentUser));
         localStorage.setItem('meeting_app_sso_user', JSON.stringify(currentUser));
       } else {
+        sessionStorage.removeItem('meeting_app_sso_user');
         localStorage.removeItem('meeting_app_sso_user');
       }
     } catch (_) {}
@@ -1403,6 +1418,89 @@ export default function App() {
     });
   };
 
+  // Authentication Gate: If user is not logged in, they CANNOT see the main booking page
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex flex-col justify-between relative overflow-x-hidden font-sans text-gray-900">
+        {/* Subtle decorative background gradient circles */}
+        <div className="absolute -top-24 -right-24 w-96 h-96 bg-red-100/60 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-red-100/50 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Toast Alert */}
+        {toast && (
+          <div className="fixed top-4 right-4 z-[100] animate-fade-in pointer-events-none">
+            <div
+              className={`px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs sm:text-sm font-bold text-white pointer-events-auto border border-white/20 ${
+                toast.type === 'error'
+                  ? 'bg-red-600'
+                  : toast.type === 'info'
+                    ? 'bg-blue-600'
+                    : 'bg-emerald-600'
+              }`}
+            >
+              {toast.type === 'error' ? (
+                <AlertCircle size={18} />
+              ) : toast.type === 'info' ? (
+                <MailIcon size={18} />
+              ) : (
+                <Check size={18} />
+              )}
+              <span>{toast.message}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Top Minimal Branding Header */}
+        <header className="w-full bg-white border-b border-gray-200 sticky top-0 shadow-2xs px-4 sm:px-6 py-2.5 sm:py-3 z-30">
+          <div className="max-w-7xl mx-auto flex items-center gap-3">
+            <div className="relative shrink-0">
+              <img
+                src="https://lh3.googleusercontent.com/d/1og-QqwMnWYP1g9iJXKiARJJmBZ07NJHN"
+                alt="QSMI Logo"
+                className="h-8 sm:h-10 w-auto object-contain"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
+              />
+            </div>
+            <h1 className="text-sm sm:text-base md:text-lg font-bold text-gray-900 leading-tight">
+              ระบบจองห้องประชุม สถานเสาวภา สภากาชาดไทย
+            </h1>
+          </div>
+        </header>
+
+        {/* Centered Login & Registration Gate Card */}
+        <main className="flex-1 flex items-center justify-center p-4 sm:p-6 z-10">
+          <SsoLoginModal
+            isOpen={true}
+            isMandatory={true}
+            asCard={true}
+            onClose={() => {}}
+            users={users}
+            departments={departments}
+            onRegisterUser={handleRegisterUser}
+            reason="เข้าสู่ระบบเพื่อเข้าสู่ระบบจัดการข้อมูลและสิทธิ์"
+            onLoginSuccess={(u) => {
+              setCurrentUser(u);
+              try {
+                sessionStorage.setItem('meeting_app_sso_user', JSON.stringify(u));
+                localStorage.setItem('meeting_app_sso_user', JSON.stringify(u));
+              } catch (_) {}
+              if (u.role === 'admin') {
+                setIsAuthenticated(true);
+                setIsAdminMode(true);
+              }
+              setIsSsoModalOpen(false);
+              showToast(`ยินดีต้อนรับคุณ ${u.name} (${u.department})`, 'success');
+              setLoginModalReason(null);
+              setActivePage('booking');
+            }}
+          />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`min-h-screen ${
@@ -1491,9 +1589,14 @@ export default function App() {
           setCurrentUser(null);
           setIsAuthenticated(false);
           setIsAdminMode(false);
-          localStorage.removeItem('meeting_app_sso_user');
-          localStorage.removeItem('meeting_app_admin_auth');
+          try {
+            sessionStorage.removeItem('meeting_app_sso_user');
+            localStorage.removeItem('meeting_app_sso_user');
+            localStorage.removeItem('meeting_app_admin_auth');
+          } catch (_) {}
           setActivePage('booking');
+          setLoginModalReason('เข้าสู่ระบบเพื่อเข้าสู่ระบบจัดการข้อมูลและสิทธิ์');
+          setIsSsoModalOpen(true);
           showToast('ออกจากระบบเรียบร้อยแล้ว', 'info');
         }}
       />
@@ -1751,6 +1854,10 @@ export default function App() {
         reason={loginModalReason}
         onLoginSuccess={(u) => {
           setCurrentUser(u);
+          try {
+            sessionStorage.setItem('meeting_app_sso_user', JSON.stringify(u));
+            localStorage.setItem('meeting_app_sso_user', JSON.stringify(u));
+          } catch (_) {}
           if (u.role === 'admin') {
             setIsAuthenticated(true);
             setIsAdminMode(true);
@@ -1772,7 +1879,7 @@ export default function App() {
           } else {
             showToast(`ยินดีต้อนรับคุณ ${u.name} (${u.department})`, 'success');
             setLoginModalReason(null);
-            setActivePage('management');
+            setActivePage('booking');
           }
         }}
       />
