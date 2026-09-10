@@ -144,8 +144,8 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
       return;
     }
 
-    if (regPassword.length < 4) {
-      setRegError('รหัสผ่านต้องมีความยาวอย่างน้อย 4 ตัวอักษร');
+    if (regPassword.length < 8) {
+      setRegError('รหัสผ่านต้องมีความยาวไม่น้อยกว่า 8 ตัวอักษร');
       return;
     }
 
@@ -410,12 +410,14 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
                   รหัสผ่าน (Password) <span className="text-red-500">*</span>
+                  <span className="text-[11px] font-normal text-gray-500 ml-1">(ไม่น้อยกว่า 8 ตัวอักษร)</span>
                 </label>
                 <div className="relative">
                   <input
                     type={showRegPassword ? 'text' : 'password'}
                     required
-                    placeholder="อย่างน้อย 4 ตัวอักษร"
+                    minLength={8}
+                    placeholder="อย่างน้อย 8 ตัวอักษร"
                     value={regPassword}
                     onChange={(e) => setRegPassword(e.target.value)}
                     className="w-full p-2.5 pr-10 border border-gray-300 rounded-xl text-xs sm:text-sm font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-[#C8102E]"
@@ -431,6 +433,13 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
                     {showRegPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
+                {regPassword.length > 0 && (
+                  <p className={`text-[11px] mt-1 font-medium ${regPassword.length >= 8 ? 'text-emerald-600' : 'text-red-500'}`}>
+                    {regPassword.length >= 8
+                      ? `✓ รหัสผ่านมีความยาว ${regPassword.length} ตัวอักษร (ผ่านเกณฑ์)`
+                      : `ความยาว ${regPassword.length}/8 ตัวอักษร (ต้องการอย่างน้อย 8 ตัวอักษร)`}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -441,6 +450,7 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
                   <input
                     type={showRegConfirmPassword ? 'text' : 'password'}
                     required
+                    minLength={8}
                     placeholder="กรอกรหัสผ่านซ้ำอีกครั้ง"
                     value={regConfirmPassword}
                     onChange={(e) => setRegConfirmPassword(e.target.value)}
@@ -457,6 +467,13 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
                     {showRegConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
+                {regConfirmPassword.length > 0 && (
+                  <p className={`text-[11px] mt-1 font-medium ${regConfirmPassword === regPassword ? 'text-emerald-600' : 'text-red-500'}`}>
+                    {regConfirmPassword === regPassword
+                      ? '✓ รหัสผ่านตรงกัน'
+                      : 'รหัสผ่านไม่ตรงกัน'}
+                  </p>
+                )}
               </div>
             </div>
 

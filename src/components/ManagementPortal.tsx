@@ -361,6 +361,11 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
       return;
     }
 
+    if (regPassword && regPassword.length < 8) {
+      setLoginError('รหัสผ่านต้องมีความยาวไม่น้อยกว่า 8 ตัวอักษร');
+      return;
+    }
+
     const newUser: UserAccount = {
       username: regUsername.trim().toLowerCase(),
       password: regPassword || '1234',
@@ -868,7 +873,8 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                       <input
                         type="password"
                         required
-                        placeholder="อย่างน้อย 4 ตัว"
+                        minLength={8}
+                        placeholder="อย่างน้อย 8 ตัวอักษร"
                         value={regPassword}
                         onChange={(e) => setRegPassword(e.target.value)}
                         className="w-full p-2 border border-gray-300 rounded-xl text-xs font-medium text-gray-900 outline-none focus:ring-2 focus:ring-[#C8102E]"

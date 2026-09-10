@@ -113,6 +113,11 @@ export const MyProfileTab: React.FC<MyProfileTabProps> = ({
       return;
     }
 
+    if (password && password !== (currentUser.password || '1234') && password.length < 8) {
+      setErrorMsg('รหัสผ่านต้องมีความยาวไม่น้อยกว่า 8 ตัวอักษร');
+      return;
+    }
+
     if (password && password !== confirmPassword) {
       setErrorMsg('รหัสผ่านและการยืนยันรหัสผ่านไม่ตรงกัน');
       return;
@@ -377,8 +382,9 @@ export const MyProfileTab: React.FC<MyProfileTabProps> = ({
                     <input
                       type={showPassword ? 'text' : 'password'}
                       value={password}
+                      minLength={8}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="รหัสผ่านใหม่"
+                      placeholder="รหัสผ่านใหม่ (อย่างน้อย 8 ตัวอักษร)"
                       className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-medium text-gray-900 outline-none focus:ring-2 focus:ring-[#C8102E] focus:bg-white"
                     />
                   </div>
@@ -390,6 +396,7 @@ export const MyProfileTab: React.FC<MyProfileTabProps> = ({
                     <input
                       type={showPassword ? 'text' : 'password'}
                       value={confirmPassword}
+                      minLength={8}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="ยืนยันรหัสผ่านใหม่"
                       className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-300 rounded-xl text-xs font-medium text-gray-900 outline-none focus:ring-2 focus:ring-[#C8102E] focus:bg-white"
