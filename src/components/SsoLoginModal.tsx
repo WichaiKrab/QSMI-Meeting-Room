@@ -253,12 +253,14 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
       </div>
 
         {/* Action Reason Banner (e.g. Prompt to login before booking slot) */}
-        {reason && activeMode === 'login' && (
+        {activeMode === 'login' && (
           <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 font-semibold flex items-center gap-2.5 animate-fade-in shadow-2xs">
             <AlertCircle size={18} className="text-amber-600 shrink-0" />
             <div>
-              <div className="font-bold text-gray-900">{reason}</div>
-              <div className="text-[11px] text-amber-800 font-medium mt-0.5">
+              {reason && reason !== 'เข้าสู่ระบบเพื่อจัดการข้อมูลและสิทธิ์' && (
+                <div className="font-bold text-gray-900 mb-0.5">{reason}</div>
+              )}
+              <div className={`text-amber-800 font-medium ${reason && reason !== 'เข้าสู่ระบบเพื่อจัดการข้อมูลและสิทธิ์' ? 'text-[11px]' : 'text-xs'}`}>
                 กรุณาเข้าสู่ระบบ หรือหากยังไม่มีบัญชีให้กดแท็บ &quot;สมัครสมาชิกใหม่&quot; ด้านล่าง
               </div>
             </div>

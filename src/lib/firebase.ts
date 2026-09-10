@@ -1,5 +1,11 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import {
+  initializeFirestore,
+  getFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  Firestore
+} from 'firebase/firestore';
 
 // Fallback configuration values if env variables are not present
 const defaultEnv = {
@@ -26,6 +32,25 @@ const databaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID ||
   import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || 
   '(default)';
 
-export const db = getFirestore(app, databaseId);
+let dbInstance: Firestore;
+
+try {
+  // Initialize Firestore with IndexedDB Multi-Tab Persistent Cache to drastically minimize Read operations
+  dbInstance = initializeFirestore(
+    app,
+    {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+      })
+    },
+    databaseId !== '(default)' ? databaseId : undefined
+  );
+} catch {
+  // Fallback to default instance if already initialized (e.g. during HMR or testing)
+  dbInstance = getFirestore(app, databaseId);
+}
+
+export const db = dbInstance;
 
 export default app;
+

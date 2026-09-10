@@ -349,9 +349,9 @@ export function subscribeToAuditLogs(callback: (logs: AuditLog[]) => void) {
     }
   } catch (_) {}
 
-  // Real-time Firestore subscription (limit to 100 to conserve Firestore read quota)
+  // Real-time Firestore subscription (limit to 50 to conserve Firestore read quota)
   try {
-    const q = query(collection(db, AUDIT_LOGS_COL), orderBy('timestamp', 'desc'), limit(100));
+    const q = query(collection(db, AUDIT_LOGS_COL), orderBy('timestamp', 'desc'), limit(50));
     const unsubscribe = onSnapshot(
       q,
       async (snapshot) => {
@@ -400,6 +400,27 @@ export function subscribeToAuditLogs(callback: (logs: AuditLog[]) => void) {
     console.warn('Failed to start Firestore audit logs subscription:', err);
     callback(getInitialHistoricalLogs());
     return () => {};
+  }
+}
+
+/**
+ * Fetch latest audit logs once on-demand without maintaining continuous real-time listener
+ */
+export async function fetchLatestAuditLogs(limitCount = 50): Promise<AuditLog[]> {
+  try {
+    const q = query(collection(db, AUDIT_LOGS_COL), orderBy('timestamp', 'desc'), limit(limitCount));
+    const snap = await getDocs(q);
+    const logs: AuditLog[] = [];
+    snap.forEach((d) => logs.push(d.data() as AuditLog));
+    if (logs.length > 0) {
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(logs));
+      } catch (_) {}
+    }
+    return logs;
+  } catch (err) {
+    console.warn('Failed to fetch latest audit logs:', err);
+    return [];
   }
 }
 

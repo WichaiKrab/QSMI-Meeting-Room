@@ -1121,11 +1121,6 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
         >
           <CalendarCheck size={16} className={activeTab === 'my_history' ? 'text-emerald-400' : 'text-gray-500'} />
           <span>รายการจองของฉัน</span>
-          {myBookingsCount > 0 && (
-            <span className="px-1.5 py-0.2 text-[10px] font-extrabold bg-[#C8102E] text-white rounded-full">
-              {myBookingsCount}
-            </span>
-          )}
         </button>
 
         {/* Tab 3: Approvals (อนุมัติการจองห้อง) - Admin & Manager */}
@@ -1247,11 +1242,6 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
           >
             <ShieldCheck size={16} className={activeTab === 'audit_logs' ? 'text-amber-400' : 'text-gray-500'} />
             <span>ประวัติการเข้าใช้งาน (Audit Log)</span>
-            {auditLogs.length > 0 && (
-              <span className="px-1.5 py-0.2 text-[10px] font-extrabold bg-indigo-600 text-white rounded-full">
-                {auditLogs.length > 99 ? '99+' : auditLogs.length}
-              </span>
-            )}
           </button>
         )}
       </div>

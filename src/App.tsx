@@ -24,7 +24,7 @@ import {
   createUserRejectionEmail
 } from './utils/emailService';
 import { checkBookingOverlap, formatThaiDate, formatThaiTime, isBookingInPast, SELECTABLE_TIMES } from './utils/thaiDate';
-import { subscribeToAuditLogs, logActivity, getInitialHistoricalLogs } from './lib/auditLogService';
+import { subscribeToAuditLogs, fetchLatestAuditLogs, logActivity, getInitialHistoricalLogs } from './lib/auditLogService';
 import {
   initializeFirestoreDefaults,
   subscribeToRooms,
@@ -290,10 +290,9 @@ export default function App() {
           return 'ออกจากระบบอัตโนมัติเนื่องจากไม่มีการใช้งาน';
         }
       }
-      const sessionUser = sessionStorage.getItem('meeting_app_sso_user');
-      return !sessionUser ? 'เข้าสู่ระบบเพื่อจัดการข้อมูลและสิทธิ์' : null;
+      return null;
     } catch {
-      return 'เข้าสู่ระบบเพื่อจัดการข้อมูลและสิทธิ์';
+      return null;
     }
   });
   const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState(false);
@@ -400,7 +399,7 @@ export default function App() {
       setIsSsoModalOpen(true);
       showToast('ออกจากระบบอัตโนมัติเนื่องจากไม่มีการใช้งาน', 'warning');
     } else {
-      setLoginModalReason('เข้าสู่ระบบเพื่อจัดการข้อมูลและสิทธิ์');
+      setLoginModalReason(null);
       setIsSsoModalOpen(true);
       showToast(reason, 'info');
     }
@@ -528,7 +527,7 @@ export default function App() {
                 setIsSsoModalOpen(true);
                 showToast('ออกจากระบบอัตโนมัติเนื่องจากไม่มีการใช้งาน (ซิงค์จากแท็บอื่น)', 'warning');
               } else {
-                setLoginModalReason('เข้าสู่ระบบเพื่อจัดการข้อมูลและสิทธิ์');
+                setLoginModalReason(null);
                 setIsSsoModalOpen(true);
                 showToast(payload.reason || 'ออกจากระบบแล้ว (ซิงค์จากแท็บอื่น)', 'info');
               }
@@ -646,9 +645,9 @@ export default function App() {
     };
   }, []);
 
-  // Subscribe to Audit Logs ONLY for Super Admins to drastically reduce Firestore Read quotas
+  // Subscribe to Audit Logs ONLY for Super Admins when viewing management page to drastically reduce Firestore Read quotas
   useEffect(() => {
-    if (currentUser?.role !== 'admin') return;
+    if (currentUser?.role !== 'admin' || activePage !== 'management') return;
 
     const unsubAuditLogs = subscribeToAuditLogs((cloudLogs) => {
       if (cloudLogs && cloudLogs.length > 0) {
@@ -662,7 +661,7 @@ export default function App() {
     return () => {
       unsubAuditLogs();
     };
-  }, [currentUser?.role]);
+  }, [currentUser?.role, activePage]);
 
   // Sync to localStorage (Fallback and instant cache)
   useEffect(() => {
@@ -1157,7 +1156,8 @@ export default function App() {
           room.id,
           startDateTime,
           endDateTime,
-          editingBooking.id
+          editingBooking.id,
+          bookings
         );
 
         if (!result.success) {
@@ -1219,7 +1219,8 @@ export default function App() {
           room.id,
           startDateTime,
           endDateTime,
-          null
+          null,
+          bookings
         );
 
         if (!result.success) {
@@ -1995,7 +1996,7 @@ export default function App() {
             users={users}
             departments={departments}
             onRegisterUser={handleRegisterUser}
-            reason={loginModalReason || 'เข้าสู่ระบบเพื่อจัดการข้อมูลและสิทธิ์'}
+            reason={loginModalReason}
             onLoginSuccess={(u) => {
               const now = Date.now();
               lastActivityTimeRef.current = now;
@@ -2062,7 +2063,7 @@ export default function App() {
         onChangePage={(p) => {
           if (p === 'management' && !currentUser) {
             setPendingBookingSlot(null);
-            setLoginModalReason('กรุณาเข้าสู่ระบบก่อนเข้าใช้งานระบบจัดการข้อมูลและสิทธิ์');
+            setLoginModalReason(null);
             setIsSsoModalOpen(true);
             return;
           }
@@ -2107,7 +2108,7 @@ export default function App() {
         }}
         onOpenLoginModal={() => {
           setPendingBookingSlot(null);
-          setLoginModalReason('เข้าสู่ระบบเพื่อจัดการข้อมูลและสิทธิ์');
+          setLoginModalReason(null);
           setIsSsoModalOpen(true);
         }}
         onLogoutUser={() => {
@@ -2129,10 +2130,9 @@ export default function App() {
             users={users}
             departments={departments}
             auditLogs={auditLogs}
-            onRefreshAuditLogs={() => {
-              subscribeToAuditLogs((fresh) => {
-                if (fresh && fresh.length > 0) setAuditLogs(fresh);
-              });
+            onRefreshAuditLogs={async () => {
+              const fresh = await fetchLatestAuditLogs(50);
+              if (fresh && fresh.length > 0) setAuditLogs(fresh);
             }}
             onAddDepartment={handleAddDepartment}
             onUpdateDepartment={handleUpdateDepartment}

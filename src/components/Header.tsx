@@ -405,13 +405,7 @@ export const Header: React.FC<HeaderProps> = ({
                         </div>
                         <span>รายการจองของฉัน</span>
                       </div>
-                      {myBookingsCount > 0 ? (
-                        <span className="px-1.5 py-0.2 text-[10px] font-bold text-white bg-[#C8102E] rounded-full">
-                          {myBookingsCount} รายการ
-                        </span>
-                      ) : (
-                        <ChevronRight size={14} className="text-gray-300" />
-                      )}
+                      <ChevronRight size={14} className="text-gray-300" />
                     </button>
 
                     {/* Notifications */}

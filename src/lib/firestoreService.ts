@@ -8,6 +8,7 @@ import {
   deleteDoc,
   onSnapshot,
   query,
+  where,
   orderBy,
   limit
 } from 'firebase/firestore';
@@ -29,10 +30,10 @@ const EMAILS_COL = 'emailNotifications';
 const MAIL_QUEUE_COL = 'mail';
 const USER_NOTIF_STATES_COL = 'userNotificationStates';
 
-// Initialize default data if firestore is empty (Optimized with limit(1) to save reads)
+// Initialize default data if firestore is empty (Persisted in localStorage to avoid redundant reads)
 export async function initializeFirestoreDefaults() {
   try {
-    if (typeof window !== 'undefined' && sessionStorage.getItem('meeting_app_firestore_seeded')) {
+    if (typeof window !== 'undefined' && localStorage.getItem('meeting_app_firestore_seeded')) {
       return;
     }
 
@@ -70,7 +71,7 @@ export async function initializeFirestoreDefaults() {
     }
 
     if (typeof window !== 'undefined') {
-      sessionStorage.setItem('meeting_app_firestore_seeded', 'true');
+      localStorage.setItem('meeting_app_firestore_seeded', 'true');
     }
   } catch (err) {
     console.warn('Firestore initialization note:', err);
@@ -169,7 +170,8 @@ export function subscribeToDepartments(callback: (depts: Department[]) => void) 
 }
 
 export function subscribeToEmailNotifications(callback: (emails: EmailNotification[]) => void) {
-  const q = query(collection(db, EMAILS_COL), limit(50));
+  // Limit to 20 recent notifications to minimize Firestore reads
+  const q = query(collection(db, EMAILS_COL), limit(20));
   return onSnapshot(q, (snapshot) => {
     const items: EmailNotification[] = [];
     snapshot.forEach((docSnap) => items.push(docSnap.data() as EmailNotification));
@@ -203,7 +205,24 @@ export interface ConcurrencyCheckResult {
 }
 
 /**
- * ดึงรายการการจองล่าสุดทั้งหมดจาก Firestore โดยตรง
+ * ดึงรายการการจองล่าสุดเฉพาะห้องที่ต้องการตรวจสอบจาก Firestore
+ * ลดจำนวน Read จาก 400+ รายการ เหลือเพียงหลักสิบหรือหน่วยสำหรับห้องนั้นๆ
+ */
+export async function getFreshRoomBookingsFromFirestore(roomId: string): Promise<Booking[]> {
+  try {
+    const q = query(collection(db, BOOKINGS_COL), where('roomId', '==', roomId));
+    const snap = await getDocs(q);
+    const items: Booking[] = [];
+    snap.forEach((d) => items.push(d.data() as Booking));
+    return items;
+  } catch (err: any) {
+    console.error('Error getting fresh room bookings from Firestore:', err);
+    throw new Error('ไม่สามารถตรวจสอบตารางเวลาห้องจากฐานข้อมูลคลาวด์ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต');
+  }
+}
+
+/**
+ * ดึงรายการการจองล่าสุดทั้งหมดจาก Firestore (เก็บไว้สำหรับกรณีฉุกเฉินหรือ Admin)
  */
 export async function getFreshBookingsFromFirestore(): Promise<Booking[]> {
   try {
@@ -219,26 +238,26 @@ export async function getFreshBookingsFromFirestore(): Promise<Booking[]> {
 
 /**
  * บันทึกหรืออัปเดตการจองพร้อมตรวจสอบการจองซ้อนทับแบบเรียลไทม์กับฐานข้อมูลคลาวด์โดยตรง
- * เพื่อป้องกันปัญหา Race Condition กรณีมีผู้ใช้งานกดจองพร้อมกันในเวลาเดียวกัน
+ * ปรับปรุงประสิทธิภาพ: ดึงเฉพาะห้องที่กำลังจะจอง แทนที่จะโหลดข้อมูลการจองทั้งระบบ (ประหยัด Read 95%+)
  */
 export async function saveBookingWithConcurrencyCheck(
   bookingData: Omit<Booking, 'id'> & { id?: string },
   roomId: string,
   startDateTime: Date,
   endDateTime: Date,
-  excludeId: string | null = null
+  excludeId: string | null = null,
+  existingLocalBookings?: Booking[]
 ): Promise<ConcurrencyCheckResult> {
   try {
-    // 1. ดึงข้อมูลการจองล่าสุดทั้งหมดจาก Firestore โดยตรง ณ วินาทีที่กดบันทึก
-    const freshBookings = await getFreshBookingsFromFirestore();
+    // 1. ดึงข้อมูลการจองล่าสุดเฉพาะห้องที่ต้องการจองจาก Firestore เพื่อความรวดเร็วและประหยัดโควตา Read
+    const freshRoomBookings = await getFreshRoomBookingsFromFirestore(roomId);
 
     const nStart = startDateTime.getTime();
     const nEnd = endDateTime.getTime();
 
     // 2. ตรวจสอบว่ามีรายการใดใน Cloud ที่ทับซ้อนกับห้องและช่วงเวลานี้หรือไม่
-    for (const b of freshBookings) {
+    for (const b of freshRoomBookings) {
       if (excludeId && b.id === excludeId) continue;
-      if (b.roomId !== roomId) continue;
       if (b.status === 'rejected' || b.status === 'cancelled') continue;
 
       const bStart = new Date(b.startTime).getTime();
@@ -249,7 +268,6 @@ export async function saveBookingWithConcurrencyCheck(
         return {
           success: false,
           conflictWith: b,
-          allFreshBookings: freshBookings,
           error: `ช่วงเวลาทับซ้อนกับการจอง "${b.topic}" ของ ${b.requesterName || 'ผู้ใช้งานอื่น'}`
         };
       }
@@ -258,9 +276,14 @@ export async function saveBookingWithConcurrencyCheck(
     // 3. ป้องกันปัญหา ID ซ้ำกัน (Atomic & Collision-Proof ID Generation)
     let finalId = bookingData.id;
     if (!finalId) {
-      const existingIds = new Set(freshBookings.map((b) => b.id));
+      // คำนวณ maxNum จาก existingLocalBookings ในหน่วยความจำเพื่อไม่เสีย Read เพิ่ม
+      const basePool = (existingLocalBookings && existingLocalBookings.length > 0)
+        ? existingLocalBookings
+        : freshRoomBookings;
+
+      const existingIds = new Set(basePool.map((b) => b.id));
       let maxNum = 0;
-      for (const b of freshBookings) {
+      for (const b of basePool) {
         if (b.id?.startsWith('MR-')) {
           const n = parseInt(b.id.replace('MR-', ''), 10);
           if (!isNaN(n) && n > maxNum) maxNum = n;
@@ -269,10 +292,10 @@ export async function saveBookingWithConcurrencyCheck(
       let nextNum = maxNum + 1;
       finalId = `MR-${String(nextNum).padStart(5, '0')}`;
 
-      // Loop ตรวจสอบซ้ำทั้งใน Local Set และตรวจสอบกับ Document จริงใน Firestore เพื่อป้องกัน Collision 100%
+      // ตรวจสอบกับ Cloud Document โดยตรง (ใช้เพียง 1 Read) เพื่อป้องกัน Collision 100%
       let isUnique = false;
       let attempts = 0;
-      while (!isUnique && attempts < 10) {
+      while (!isUnique && attempts < 5) {
         if (existingIds.has(finalId)) {
           nextNum++;
           finalId = `MR-${String(nextNum).padStart(5, '0')}`;
@@ -280,7 +303,6 @@ export async function saveBookingWithConcurrencyCheck(
           continue;
         }
 
-        // ตรวจสอบกับ Cloud Document โดยตรง
         try {
           const docCheck = await getDoc(doc(db, BOOKINGS_COL, finalId));
           if (docCheck.exists()) {
@@ -292,7 +314,6 @@ export async function saveBookingWithConcurrencyCheck(
             isUnique = true;
           }
         } catch (_) {
-          // หากติด permission หรือ network ใน getDoc ให้ใช้ fallback id ป้องกันการเขียนทับ
           isUnique = true;
         }
       }
@@ -308,8 +329,7 @@ export async function saveBookingWithConcurrencyCheck(
 
     return {
       success: true,
-      booking: finalBooking,
-      allFreshBookings: [finalBooking, ...freshBookings.filter((b) => b.id !== finalId)]
+      booking: finalBooking
     };
   } catch (err: any) {
     console.error('Error in saveBookingWithConcurrencyCheck:', err);
