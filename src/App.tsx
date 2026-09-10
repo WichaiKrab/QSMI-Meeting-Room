@@ -282,13 +282,13 @@ export default function App() {
       if (lastActStr) {
         const lastAct = parseInt(lastActStr, 10);
         if (!isNaN(lastAct) && Date.now() - lastAct >= 60 * 1000) {
-          return 'ออกจากระบบอัตโนมัติเนื่องจากไม่มีการใช้งานเกิน 1 นาที';
+          return 'ออกจากระบบอัตโนมัติเนื่องจากไม่มีการใช้งาน';
         }
       }
       const sessionUser = sessionStorage.getItem('meeting_app_sso_user');
-      return !sessionUser ? 'เข้าสู่ระบบเพื่อเข้าสู่ระบบจัดการข้อมูลและสิทธิ์' : null;
+      return !sessionUser ? 'เข้าสู่ระบบเพื่อจัดการข้อมูลและสิทธิ์' : null;
     } catch {
-      return 'เข้าสู่ระบบเพื่อเข้าสู่ระบบจัดการข้อมูลและสิทธิ์';
+      return 'เข้าสู่ระบบเพื่อจัดการข้อมูลและสิทธิ์';
     }
   });
   const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState(false);
@@ -2100,7 +2100,7 @@ export default function App() {
         }}
         onOpenLoginModal={() => {
           setPendingBookingSlot(null);
-          setLoginModalReason('เข้าสู่ระบบเพื่อเข้าสู่ระบบจัดการข้อมูลและสิทธิ์');
+          setLoginModalReason('เข้าสู่ระบบเพื่อจัดการข้อมูลและสิทธิ์');
           setIsSsoModalOpen(true);
         }}
         onLogoutUser={() => {
