@@ -736,7 +736,7 @@ export function createUserRegistrationEmails(
 
   // 1. Email ถึง ผู้สมัคร (User)
   const userRecipient = user.email?.trim() || `${user.username.trim()}@qsmi.or.th`;
-  const userSubject = `[รออนุมัติ] ได้รับคำขอลงทะเบียนเข้าใช้งานระบบ: คุณ ${user.name}`;
+  const userSubject = `[รออนุมัติ] ได้รับคำขอลงทะเบียนเข้าใช้งานระบบ: ${user.name}`;
   const userPlainBody =
     `เรียน คุณ ${user.name},\n\n` +
     `ระบบได้รับคำขอลงทะเบียนสมัครใช้งานระบบจองห้องประชุมออนไลน์ สถานเสาวภา สภากาชาดไทย ของท่านเรียบร้อยแล้ว\n` +
@@ -798,7 +798,7 @@ export function createUserRegistrationEmails(
 
   // 2. Email ถึง ผู้ดูแลระบบสูงสุด (Super Admin เท่านั้น ไม่ส่งหา Admin ทั่วไป)
   const superAdminRecipients = getSuperAdminEmailRecipients(users);
-  const adminSubject = `[แจ้งเตือน Super Admin] มีคำขอลงทะเบียนผู้ใช้งานใหม่: คุณ ${user.name}`;
+  const adminSubject = `[แจ้งเตือน Super Admin] มีคำขอลงทะเบียนผู้ใช้งานใหม่: ${user.name}`;
   const adminPlainBody =
     `เรียน ผู้ดูแลระบบสูงสุด (Super Admin),\n\n` +
     `มีคำขอลงทะเบียนผู้ใช้งานใหม่เข้าสู่ระบบจองห้องประชุมออนไลน์ สถานเสาวภา สภากาชาดไทย\n` +
@@ -891,7 +891,7 @@ export function createUserApprovalEmails(
   const baseUrl =
     typeof window !== 'undefined' ? window.location.origin : 'https://qsmi-meeting-room.web.app';
   const userRecipient = user.email?.trim() || `${user.username.trim()}@qsmi.or.th`;
-  const subject = `✅ [อนุมัติแล้ว] บัญชีผู้ใช้งานของคุณได้รับการอนุมัติ: ระบบจองห้องประชุม สถานเสาวภา`;
+  const subject = `✅ [อนุมัติแล้ว] บัญชีผู้ใช้งานของคุณได้รับการอนุมัติ: ระบบจองห้องประชุม สถานเสาวภา สภากาชาดไทย`;
 
   const plainBody =
     `เรียน คุณ ${user.name},\n\n` +
@@ -959,7 +959,7 @@ export function createUserApprovalEmails(
 
   // แจ้งเตือนเฉพาะผู้ดูแลระบบสูงสุด (Super Admin) ที่เปิดรับอีเมลแจ้งเตือน ไม่ส่งหา Admin ทั่วไป
   const superAdminRecipients = getSuperAdminEmailRecipients(users);
-  const adminSubject = `[แจ้งเตือน Super Admin] อนุมัติสิทธิ์ผู้ใช้งานใหม่แล้ว: คุณ ${user.name}`;
+  const adminSubject = `[แจ้งเตือน Super Admin] อนุมัติสิทธิ์ผู้ใช้งานใหม่แล้ว: ${user.name}`;
   const adminPlainBody =
     `เรียน ผู้ดูแลระบบสูงสุด (Super Admin),\n\n` +
     `มีการอนุมัติบัญชีผู้ใช้งานใหม่ในระบบจองห้องประชุมออนไลน์ สถานเสาวภา สภากาชาดไทย เรียบร้อยแล้ว โดย ${approvedBy}\n\n` +
