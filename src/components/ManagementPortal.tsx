@@ -909,8 +909,8 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                           (u) => u.username.trim().toLowerCase() === regUsername.trim().toLowerCase()
                         );
                         return (
-                          <p className={`text-[11px] mt-1 font-medium ${isDup ? 'text-red-500' : 'text-emerald-600'}`}>
-                            {isDup ? '⚠️ ชื่อผู้ใช้งานนี้มีอยู่ในระบบแล้ว กรุณาเลือกชื่ออื่น' : '✓ สามารถใช้ชื่อผู้ใช้งานนี้ได้'}
+                          <p className={`text-[10px] sm:text-[11px] mt-1 font-medium leading-tight ${isDup ? 'text-red-500' : 'text-emerald-600'}`}>
+                            {isDup ? '⚠️ ชื่อผู้ใช้งานนี้มีอยู่ในระบบแล้ว' : '✓ สามารถใช้ชื่อผู้ใช้งานนี้ได้'}
                           </p>
                         );
                       })()
