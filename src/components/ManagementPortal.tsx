@@ -332,7 +332,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
     setLoginError(null);
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
 
@@ -355,7 +355,21 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
       return;
     }
 
-    const validPwd = found.password || (found.role === 'admin' ? 'admin123' : '1234');
+    let validPwd = found.password;
+    if (!validPwd) {
+      try {
+        const { getDoc, doc } = await import('firebase/firestore');
+        const { db } = await import('../lib/firebase');
+        const userDoc = await getDoc(doc(db, 'users', found.id || found.username));
+        if (userDoc.exists()) {
+          validPwd = userDoc.data()?.password;
+        }
+      } catch (_) {}
+    }
+    if (!validPwd) {
+      validPwd = found.role === 'admin' ? 'admin123' : '1234';
+    }
+
     if (password === validPwd || password === '1234' || (found.role === 'admin' && password === 'admin123')) {
       onLogin(found);
     } else {

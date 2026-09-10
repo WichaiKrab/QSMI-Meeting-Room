@@ -90,6 +90,7 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
   const [regPhone, setRegPhone] = useState('');
   const [regError, setRegError] = useState('');
   const [registeredApplicant, setRegisteredApplicant] = useState<UserAccount | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   // Sync regDept if list of available departments updates
   useEffect(() => {
@@ -98,7 +99,7 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
     }
   }, [availableDepts, regDept]);
 
-  const handleLoginFormSubmit = (e: React.FormEvent) => {
+  const handleLoginFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -123,9 +124,27 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
     }
 
     // Check password
-    const validPwd =
-      targetUser.password ||
-      (targetUser.role === 'admin' ? 'admin123' : '1234');
+    let validPwd = targetUser.password;
+    if (!validPwd) {
+      // In case password was stripped from storage cache, verify securely with Firestore doc
+      try {
+        setIsVerifying(true);
+        const { getDoc, doc } = await import('firebase/firestore');
+        const { db } = await import('../lib/firebase');
+        const userDoc = await getDoc(doc(db, 'users', targetUser.id || targetUser.username));
+        if (userDoc.exists()) {
+          validPwd = userDoc.data()?.password;
+        }
+      } catch (err) {
+        console.warn('Could not verify credentials against Firestore:', err);
+      } finally {
+        setIsVerifying(false);
+      }
+    }
+
+    if (!validPwd) {
+      validPwd = targetUser.role === 'admin' ? 'admin123' : '1234';
+    }
 
     if (password === validPwd || password === '1234' || (targetUser.role === 'admin' && password === 'admin123')) {
       onLoginSuccess(targetUser);
@@ -658,7 +677,7 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
                 type="button"
                 onClick={() => {
                   setUsername(registeredApplicant.username);
-                  setPassword(registeredApplicant.password || '');
+                  setPassword('');
                   setActiveMode('login');
                 }}
                 className="w-full py-2.5 bg-[#C8102E] hover:bg-[#a00c24] text-white font-bold rounded-xl text-xs sm:text-sm shadow-xs transition"

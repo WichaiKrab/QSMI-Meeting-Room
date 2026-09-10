@@ -34,7 +34,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -73,7 +73,21 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
       return;
     }
 
-    const validPwd = targetUser.password || 'admin123';
+    let validPwd = targetUser.password;
+    if (!validPwd) {
+      try {
+        const { getDoc, doc } = await import('firebase/firestore');
+        const { db } = await import('../lib/firebase');
+        const userDoc = await getDoc(doc(db, 'users', targetUser.id || targetUser.username));
+        if (userDoc.exists()) {
+          validPwd = userDoc.data()?.password;
+        }
+      } catch (_) {}
+    }
+    if (!validPwd) {
+      validPwd = 'admin123';
+    }
+
     if (password === validPwd || (targetUser.role === 'admin' && password === 'admin123')) {
       onSuccess(targetUser);
       onClose();

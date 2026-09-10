@@ -73,6 +73,11 @@ import {
   ResendEmailModal,
   DeleteConfirmModal
 } from './components/ConfirmModals';
+import {
+  sanitizeUserForStorage,
+  sanitizeUsersForStorage,
+  cleanupStorageCredentials
+} from './utils/securityUtils';
 
 export default function App() {
   // --- Page Navigation State (Separated Booking vs Login/Management) ---
@@ -595,7 +600,7 @@ export default function App() {
       if (cloudUsers && cloudUsers.length > 0) {
         setUsers(cloudUsers);
         try {
-          localStorage.setItem('meeting_app_users', JSON.stringify(cloudUsers));
+          localStorage.setItem('meeting_app_users', JSON.stringify(sanitizeUsersForStorage(cloudUsers)));
         } catch (_) {}
 
         setCurrentUser((prev) => {
@@ -611,7 +616,7 @@ export default function App() {
               role: updatedSelf.role || prev.role || 'employee',
             };
             try {
-              localStorage.setItem('meeting_app_sso_user', JSON.stringify(merged));
+              localStorage.setItem('meeting_app_sso_user', JSON.stringify(sanitizeUserForStorage(merged)));
             } catch (_) {}
             return merged;
           }
@@ -680,7 +685,7 @@ export default function App() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('meeting_app_users', JSON.stringify(users));
+      localStorage.setItem('meeting_app_users', JSON.stringify(sanitizeUsersForStorage(users)));
     } catch (_) {}
   }, [users]);
 
@@ -693,8 +698,9 @@ export default function App() {
   useEffect(() => {
     try {
       if (currentUser) {
-        sessionStorage.setItem('meeting_app_sso_user', JSON.stringify(currentUser));
-        localStorage.setItem('meeting_app_sso_user', JSON.stringify(currentUser));
+        const safeUser = sanitizeUserForStorage(currentUser);
+        sessionStorage.setItem('meeting_app_sso_user', JSON.stringify(safeUser));
+        localStorage.setItem('meeting_app_sso_user', JSON.stringify(safeUser));
       } else {
         sessionStorage.removeItem('meeting_app_sso_user');
         localStorage.removeItem('meeting_app_sso_user');
@@ -1825,7 +1831,7 @@ export default function App() {
     if (currentUser?.username === username) {
       setCurrentUser(updatedUser);
       try {
-        localStorage.setItem('meeting_app_sso_user', JSON.stringify(updatedUser));
+        localStorage.setItem('meeting_app_sso_user', JSON.stringify(sanitizeUserForStorage(updatedUser)));
       } catch (_) {}
     }
 
@@ -1998,8 +2004,9 @@ export default function App() {
               } catch (_) {}
               setCurrentUser(u);
               try {
-                sessionStorage.setItem('meeting_app_sso_user', JSON.stringify(u));
-                localStorage.setItem('meeting_app_sso_user', JSON.stringify(u));
+                const safeU = sanitizeUserForStorage(u);
+                sessionStorage.setItem('meeting_app_sso_user', JSON.stringify(safeU));
+                localStorage.setItem('meeting_app_sso_user', JSON.stringify(safeU));
               } catch (_) {}
               if (u.role === 'admin') {
                 setIsAuthenticated(true);
@@ -2376,8 +2383,9 @@ export default function App() {
           } catch (_) {}
           setCurrentUser(u);
           try {
-            sessionStorage.setItem('meeting_app_sso_user', JSON.stringify(u));
-            localStorage.setItem('meeting_app_sso_user', JSON.stringify(u));
+            const safeU = sanitizeUserForStorage(u);
+            sessionStorage.setItem('meeting_app_sso_user', JSON.stringify(safeU));
+            localStorage.setItem('meeting_app_sso_user', JSON.stringify(safeU));
           } catch (_) {}
           if (u.role === 'admin') {
             setIsAuthenticated(true);
