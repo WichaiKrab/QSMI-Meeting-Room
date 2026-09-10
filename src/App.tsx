@@ -361,7 +361,7 @@ export default function App() {
         department: userLoggingOut.department,
         actionType: isAuto ? 'AUTO_LOGOUT' : 'LOGOUT',
         actionPerformed: isAuto
-          ? 'ออกจากระบบอัตโนมัติ (ไม่มีการใช้งานระบบเกิน 1 นาที)'
+          ? 'ออกจากระบบอัตโนมัติ (ไม่มีการใช้งาน)'
           : 'ออกจากระบบโดยผู้ใช้งาน (Sign Out)'
       });
     }
@@ -391,11 +391,11 @@ export default function App() {
     setViewingBooking(null);
 
     if (isAuto) {
-      setLoginModalReason('ออกจากระบบอัตโนมัติเนื่องจากไม่มีการใช้งานเกิน 1 นาที');
+      setLoginModalReason('ออกจากระบบอัตโนมัติเนื่องจากไม่มีการใช้งาน');
       setIsSsoModalOpen(true);
-      showToast('ออกจากระบบอัตโนมัติ เนื่องจากไม่มีการใช้งานระบบเกิน 1 นาที', 'warning');
+      showToast('ออกจากระบบอัตโนมัติเนื่องจากไม่มีการใช้งาน', 'warning');
     } else {
-      setLoginModalReason('เข้าสู่ระบบเพื่อเข้าสู่ระบบจัดการข้อมูลและสิทธิ์');
+      setLoginModalReason('เข้าสู่ระบบเพื่อจัดการข้อมูลและสิทธิ์');
       setIsSsoModalOpen(true);
       showToast(reason, 'info');
     }
@@ -464,7 +464,7 @@ export default function App() {
 
       const idleDuration = Date.now() - lastAct;
       if (idleDuration >= INACTIVITY_TIMEOUT_MS) {
-        handleLogout('ออกจากระบบอัตโนมัติ เนื่องจากไม่มีการใช้งานระบบเกิน 1 นาที', true);
+        handleLogout('ออกจากระบบอัตโนมัติเนื่องจากไม่มีการใช้งาน', true);
       }
     }, 1000);
 
@@ -484,7 +484,7 @@ export default function App() {
         } catch (_) {}
 
         if (Date.now() - lastAct >= INACTIVITY_TIMEOUT_MS) {
-          handleLogout('ออกจากระบบอัตโนมัติ เนื่องจากไม่มีการใช้งานระบบเกิน 1 นาที', true);
+          handleLogout('ออกจากระบบอัตโนมัติเนื่องจากไม่มีการใช้งาน', true);
         }
       }
     };
@@ -519,11 +519,11 @@ export default function App() {
               setEditingBooking(null);
               setViewingBooking(null);
               if (payload.isAuto) {
-                setLoginModalReason('ออกจากระบบอัตโนมัติเนื่องจากไม่มีการใช้งานเกิน 1 นาที (ซิงค์จากแท็บอื่น)');
+                setLoginModalReason('ออกจากระบบอัตโนมัติเนื่องจากไม่มีการใช้งาน (ซิงค์จากแท็บอื่น)');
                 setIsSsoModalOpen(true);
-                showToast('ออกจากระบบอัตโนมัติเนื่องจากไม่มีการใช้งานระบบเกิน 1 นาที (ซิงค์จากแท็บอื่น)', 'warning');
+                showToast('ออกจากระบบอัตโนมัติเนื่องจากไม่มีการใช้งาน (ซิงค์จากแท็บอื่น)', 'warning');
               } else {
-                setLoginModalReason('เข้าสู่ระบบเพื่อเข้าสู่ระบบจัดการข้อมูลและสิทธิ์');
+                setLoginModalReason('เข้าสู่ระบบเพื่อจัดการข้อมูลและสิทธิ์');
                 setIsSsoModalOpen(true);
                 showToast(payload.reason || 'ออกจากระบบแล้ว (ซิงค์จากแท็บอื่น)', 'info');
               }
@@ -1989,7 +1989,7 @@ export default function App() {
             users={users}
             departments={departments}
             onRegisterUser={handleRegisterUser}
-            reason={loginModalReason || 'เข้าสู่ระบบเพื่อเข้าสู่ระบบจัดการข้อมูลและสิทธิ์'}
+            reason={loginModalReason || 'เข้าสู่ระบบเพื่อจัดการข้อมูลและสิทธิ์'}
             onLoginSuccess={(u) => {
               const now = Date.now();
               lastActivityTimeRef.current = now;
