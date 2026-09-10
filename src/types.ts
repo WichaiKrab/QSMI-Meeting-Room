@@ -102,3 +102,31 @@ export interface Department {
   color?: string;
   createdAt?: string;
 }
+
+export type AuditActionType =
+  | 'LOGIN'
+  | 'LOGOUT'
+  | 'AUTO_LOGOUT'
+  | 'CREATE_BOOKING'
+  | 'UPDATE_BOOKING'
+  | 'CANCEL_BOOKING'
+  | 'APPROVE_BOOKING'
+  | 'REJECT_BOOKING'
+  | 'USER_MANAGEMENT'
+  | 'ROOM_MANAGEMENT'
+  | 'SYSTEM';
+
+export interface AuditLog {
+  id: string;
+  username: string;
+  userFullName: string;
+  userRole?: UserRole | string;
+  department?: string;
+  timestamp: string; // ISO timestamp
+  actionType: AuditActionType;
+  actionPerformed: string;
+  ipAddress: string;
+  userAgent: string;
+  browserDevice?: string;
+  details?: Record<string, any>;
+}

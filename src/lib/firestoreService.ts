@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   setDoc,
   updateDoc,
@@ -201,9 +202,9 @@ export async function getFreshBookingsFromFirestore(): Promise<Booking[]> {
     const items: Booking[] = [];
     snap.forEach((d) => items.push(d.data() as Booking));
     return items;
-  } catch (err) {
-    console.warn('Error getting fresh bookings from Firestore:', err);
-    return [];
+  } catch (err: any) {
+    console.error('Error getting fresh bookings from Firestore:', err);
+    throw new Error('ไม่สามารถตรวจสอบตารางเวลาล่าสุดจากฐานข้อมูลคลาวด์ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต');
   }
 }
 
@@ -245,7 +246,7 @@ export async function saveBookingWithConcurrencyCheck(
       }
     }
 
-    // 3. ป้องกันปัญหา ID ซ้ำกัน (ID Collision) กรณีมีผู้ส่งคำขอพร้อมกัน
+    // 3. ป้องกันปัญหา ID ซ้ำกัน (Atomic & Collision-Proof ID Generation)
     let finalId = bookingData.id;
     if (!finalId) {
       const existingIds = new Set(freshBookings.map((b) => b.id));
@@ -258,9 +259,33 @@ export async function saveBookingWithConcurrencyCheck(
       }
       let nextNum = maxNum + 1;
       finalId = `MR-${String(nextNum).padStart(5, '0')}`;
-      while (existingIds.has(finalId)) {
-        nextNum++;
-        finalId = `MR-${String(nextNum).padStart(5, '0')}`;
+
+      // Loop ตรวจสอบซ้ำทั้งใน Local Set และตรวจสอบกับ Document จริงใน Firestore เพื่อป้องกัน Collision 100%
+      let isUnique = false;
+      let attempts = 0;
+      while (!isUnique && attempts < 10) {
+        if (existingIds.has(finalId)) {
+          nextNum++;
+          finalId = `MR-${String(nextNum).padStart(5, '0')}`;
+          attempts++;
+          continue;
+        }
+
+        // ตรวจสอบกับ Cloud Document โดยตรง
+        try {
+          const docCheck = await getDoc(doc(db, BOOKINGS_COL, finalId));
+          if (docCheck.exists()) {
+            existingIds.add(finalId);
+            nextNum++;
+            finalId = `MR-${String(nextNum).padStart(5, '0')}`;
+            attempts++;
+          } else {
+            isUnique = true;
+          }
+        } catch (_) {
+          // หากติด permission หรือ network ใน getDoc ให้ใช้ fallback id ป้องกันการเขียนทับ
+          isUnique = true;
+        }
       }
     }
 

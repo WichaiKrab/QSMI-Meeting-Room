@@ -35,15 +35,56 @@ export const formatFullThaiDate = (date: Date): string => {
   return `วัน${dayName}ที่ ${day} ${month} ${year}`;
 };
 
+/**
+ * ดึงชั่วโมงและนาทีโดยอิงเวลาประเทศไทย (Asia/Bangkok / UTC+7) เสมอ
+ * เพื่อให้การจัดตำแหน่งในตารางปฏิทินถูกต้องแม่นยำ ไม่ว่าผู้ใช้จะเปิดจาก Timezone ใดก็ตาม
+ */
+export const getBangkokHoursMinutes = (dateInput: Date | string | number): { hours: number; minutes: number } => {
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return { hours: 0, minutes: 0 };
+
+  try {
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Bangkok',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    const parts = formatter.formatToParts(d);
+    let hours = 0;
+    let minutes = 0;
+    for (const part of parts) {
+      if (part.type === 'hour') hours = parseInt(part.value, 10);
+      if (part.type === 'minute') minutes = parseInt(part.value, 10);
+    }
+    return { hours, minutes };
+  } catch (_) {
+    // Fallback: local time
+    return { hours: d.getHours(), minutes: d.getMinutes() };
+  }
+};
+
 export const isSameDay = (d1: Date | string, d2: Date | string): boolean => {
   if (!d1 || !d2) return false;
   const a = new Date(d1);
   const b = new Date(d2);
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+  if (isNaN(a.getTime()) || isNaN(b.getTime())) return false;
+
+  try {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Bangkok',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    return formatter.format(a) === formatter.format(b);
+  } catch (_) {
+    return (
+      a.getFullYear() === b.getFullYear() &&
+      a.getMonth() === b.getMonth() &&
+      a.getDate() === b.getDate()
+    );
+  }
 };
 
 export const generateTimeSlots = (): string[] => {
@@ -82,8 +123,7 @@ export const TIME_SLOTS = generateTimeSlots();
 export const SELECTABLE_TIMES = generateSelectableTimes();
 
 export const getPositionStyles = (start: Date, end: Date) => {
-  const startH = start.getHours();
-  const startM = start.getMinutes();
+  const { hours: startH, minutes: startM } = getBangkokHoursMinutes(start);
   const startTotalMins = startH * 60 + startM;
   const baseTotalMins = START_HOUR * 60 + START_MINUTE;
   const diffMins = Math.max(0, startTotalMins - baseTotalMins);
@@ -94,8 +134,7 @@ export const getPositionStyles = (start: Date, end: Date) => {
 };
 
 export const getHorizontalStyle = (start: Date, end: Date) => {
-  const startH = start.getHours();
-  const startM = start.getMinutes();
+  const { hours: startH, minutes: startM } = getBangkokHoursMinutes(start);
   const totalStartMins = startH * 60 + startM;
   const dayStartMins = START_HOUR * 60 + START_MINUTE;
   const dayEndMins = END_HOUR * 60 + END_MINUTE;

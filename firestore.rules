@@ -49,5 +49,11 @@ service cloud.firestore {
       allow read: if true;
       allow write: if true;
     }
+
+    // Audit and Activity Logs collection for Super Admin
+    match /auditLogs/{logId} {
+      allow read: if true;
+      allow write: if true;
+    }
   }
 }

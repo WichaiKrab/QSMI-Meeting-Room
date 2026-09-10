@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Check,
   AlertCircle,
@@ -7,7 +7,7 @@ import {
   Settings,
   CalendarDays
 } from 'lucide-react';
-import { Room, Booking, UserAccount, EmailNotification, CalendarView, UserRole, Department } from './types';
+import { Room, Booking, UserAccount, EmailNotification, CalendarView, UserRole, Department, AuditLog } from './types';
 import {
   INITIAL_ROOMS,
   INITIAL_BOOKINGS,
@@ -24,6 +24,7 @@ import {
   createUserRejectionEmail
 } from './utils/emailService';
 import { checkBookingOverlap, formatThaiDate, formatThaiTime, isBookingInPast, SELECTABLE_TIMES } from './utils/thaiDate';
+import { subscribeToAuditLogs, logActivity, getInitialHistoricalLogs } from './lib/auditLogService';
 import {
   initializeFirestoreDefaults,
   subscribeToRooms,
@@ -134,6 +135,16 @@ export default function App() {
 
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
     try {
+      const lastActStr = localStorage.getItem('meeting_app_last_activity');
+      if (lastActStr) {
+        const lastAct = parseInt(lastActStr, 10);
+        if (!isNaN(lastAct) && Date.now() - lastAct >= 60 * 1000) {
+          sessionStorage.removeItem('meeting_app_sso_user');
+          localStorage.removeItem('meeting_app_sso_user');
+          localStorage.removeItem('meeting_app_last_activity');
+          return null;
+        }
+      }
       const sessionUser = sessionStorage.getItem('meeting_app_sso_user');
       if (sessionUser) {
         const u = JSON.parse(sessionUser);
@@ -181,6 +192,11 @@ export default function App() {
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     try {
+      const lastActStr = localStorage.getItem('meeting_app_last_activity');
+      if (lastActStr) {
+        const lastAct = parseInt(lastActStr, 10);
+        if (!isNaN(lastAct) && Date.now() - lastAct >= 60 * 1000) return false;
+      }
       const sessionUser = sessionStorage.getItem('meeting_app_sso_user');
       if (sessionUser) {
         const u = JSON.parse(sessionUser);
@@ -194,6 +210,11 @@ export default function App() {
 
   const [isAdminMode, setIsAdminMode] = useState<boolean>(() => {
     try {
+      const lastActStr = localStorage.getItem('meeting_app_last_activity');
+      if (lastActStr) {
+        const lastAct = parseInt(lastActStr, 10);
+        if (!isNaN(lastAct) && Date.now() - lastAct >= 60 * 1000) return false;
+      }
       const sessionUser = sessionStorage.getItem('meeting_app_sso_user');
       if (sessionUser) {
         const u = JSON.parse(sessionUser);
@@ -223,10 +244,27 @@ export default function App() {
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [managementInitialTab, setManagementInitialTab] = useState<
-    'approvals' | 'users' | 'bookings' | 'my_history' | 'rooms' | 'reports' | 'directory' | 'departments' | 'my_profile'
+    'approvals' | 'users' | 'bookings' | 'my_history' | 'rooms' | 'reports' | 'directory' | 'departments' | 'my_profile' | 'audit_logs'
   >('approvals');
+
+  // Audit Logs for Super Admin
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => {
+    try {
+      const cached = localStorage.getItem('meeting_app_audit_logs');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (_) {}
+    return getInitialHistoricalLogs();
+  });
   const [isSsoModalOpen, setIsSsoModalOpen] = useState<boolean>(() => {
     try {
+      const lastActStr = localStorage.getItem('meeting_app_last_activity');
+      if (lastActStr) {
+        const lastAct = parseInt(lastActStr, 10);
+        if (!isNaN(lastAct) && Date.now() - lastAct >= 60 * 1000) return true;
+      }
       const sessionUser = sessionStorage.getItem('meeting_app_sso_user');
       return !sessionUser;
     } catch {
@@ -240,6 +278,13 @@ export default function App() {
   } | null>(null);
   const [loginModalReason, setLoginModalReason] = useState<string | null>(() => {
     try {
+      const lastActStr = localStorage.getItem('meeting_app_last_activity');
+      if (lastActStr) {
+        const lastAct = parseInt(lastActStr, 10);
+        if (!isNaN(lastAct) && Date.now() - lastAct >= 60 * 1000) {
+          return 'ออกจากระบบอัตโนมัติเนื่องจากไม่มีการใช้งานเกิน 1 นาที';
+        }
+      }
       const sessionUser = sessionStorage.getItem('meeting_app_sso_user');
       return !sessionUser ? 'เข้าสู่ระบบเพื่อเข้าสู่ระบบจัดการข้อมูลและสิทธิ์' : null;
     } catch {
@@ -274,15 +319,258 @@ export default function App() {
   // Toast feedback
   const [toast, setToast] = useState<{
     message: string;
-    type: 'success' | 'error' | 'info';
+    type: 'success' | 'error' | 'info' | 'warning';
   } | null>(null);
 
-  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+  const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'success') => {
     setToast({ message, type });
     setTimeout(() => {
       setToast(null);
-    }, 3500);
+    }, 4500);
   };
+
+  const currentUserRef = useRef<UserAccount | null>(currentUser);
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
+
+  const recordLoginLog = useCallback((u: UserAccount, source: string) => {
+    logActivity({
+      username: u.username,
+      userFullName: u.name,
+      userRole: u.role,
+      department: u.department,
+      actionType: 'LOGIN',
+      actionPerformed:
+        u.role === 'admin'
+          ? `เข้าสู่ระบบสำเร็จ (Super Admin) ผ่าน ${source}`
+          : u.role === 'manager'
+          ? `เข้าสู่ระบบสำเร็จ (Manager) ผ่าน ${source}`
+          : `เข้าสู่ระบบสำเร็จ (ผู้ใช้งาน) ผ่าน ${source}`
+    });
+  }, []);
+
+  // Centralized Logout Handler
+  const handleLogout = useCallback((reason: string = 'ออกจากระบบเรียบร้อยแล้ว', isAuto: boolean = false) => {
+    const userLoggingOut = currentUserRef.current;
+    if (userLoggingOut) {
+      logActivity({
+        username: userLoggingOut.username,
+        userFullName: userLoggingOut.name,
+        userRole: userLoggingOut.role,
+        department: userLoggingOut.department,
+        actionType: isAuto ? 'AUTO_LOGOUT' : 'LOGOUT',
+        actionPerformed: isAuto
+          ? 'ออกจากระบบอัตโนมัติ (ไม่มีการใช้งานระบบเกิน 1 นาที)'
+          : 'ออกจากระบบโดยผู้ใช้งาน (Sign Out)'
+      });
+    }
+
+    setCurrentUser(null);
+    setIsAuthenticated(false);
+    setIsAdminMode(false);
+    try {
+      sessionStorage.removeItem('meeting_app_sso_user');
+      localStorage.removeItem('meeting_app_sso_user');
+      localStorage.removeItem('meeting_app_admin_auth');
+      localStorage.removeItem('meeting_app_last_activity');
+      localStorage.setItem(
+        'meeting_app_auth_signal',
+        JSON.stringify({
+          type: 'LOGOUT',
+          timestamp: Date.now(),
+          reason,
+          isAuto
+        })
+      );
+    } catch (_) {}
+    setActivePage('booking');
+    setIsBookingModalOpen(false);
+    setIsBlockModalOpen(false);
+    setEditingBooking(null);
+    setViewingBooking(null);
+
+    if (isAuto) {
+      setLoginModalReason('ออกจากระบบอัตโนมัติเนื่องจากไม่มีการใช้งานเกิน 1 นาที');
+      setIsSsoModalOpen(true);
+      showToast('ออกจากระบบอัตโนมัติ เนื่องจากไม่มีการใช้งานระบบเกิน 1 นาที', 'warning');
+    } else {
+      setLoginModalReason('เข้าสู่ระบบเพื่อเข้าสู่ระบบจัดการข้อมูลและสิทธิ์');
+      setIsSsoModalOpen(true);
+      showToast(reason, 'info');
+    }
+  }, []);
+
+  // --- Auto-logout after 1 minute (60 seconds) of inactivity ---
+  const INACTIVITY_TIMEOUT_MS = 60 * 1000;
+  const lastActivityTimeRef = useRef<number>(Date.now());
+  const lastStorageWriteRef = useRef<number>(Date.now());
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    // Reset last activity time when currentUser is logged in
+    const startNow = Date.now();
+    lastActivityTimeRef.current = startNow;
+    lastStorageWriteRef.current = startNow;
+    try {
+      localStorage.setItem('meeting_app_last_activity', String(startNow));
+    } catch (_) {}
+
+    const markUserActivity = () => {
+      const now = Date.now();
+      lastActivityTimeRef.current = now;
+
+      // Throttle localStorage updates to once every 2 seconds
+      if (now - lastStorageWriteRef.current > 2000) {
+        lastStorageWriteRef.current = now;
+        try {
+          localStorage.setItem('meeting_app_last_activity', String(now));
+        } catch (_) {}
+      }
+    };
+
+    const activityEvents: (keyof WindowEventMap)[] = [
+      'mousemove',
+      'mousedown',
+      'keydown',
+      'keyup',
+      'input',
+      'change',
+      'focusin',
+      'touchstart',
+      'scroll',
+      'click',
+      'wheel'
+    ];
+
+    activityEvents.forEach((evt) => {
+      window.addEventListener(evt, markUserActivity, { passive: true });
+    });
+
+    // Check inactivity every 1 second
+    const intervalTimer = setInterval(() => {
+      let lastAct = lastActivityTimeRef.current;
+      try {
+        const stored = localStorage.getItem('meeting_app_last_activity');
+        if (stored) {
+          const parsed = parseInt(stored, 10);
+          if (!isNaN(parsed) && parsed > lastAct) {
+            lastAct = parsed;
+            lastActivityTimeRef.current = parsed;
+          }
+        }
+      } catch (_) {}
+
+      const idleDuration = Date.now() - lastAct;
+      if (idleDuration >= INACTIVITY_TIMEOUT_MS) {
+        handleLogout('ออกจากระบบอัตโนมัติ เนื่องจากไม่มีการใช้งานระบบเกิน 1 นาที', true);
+      }
+    }, 1000);
+
+    // Also check immediately when window / tab gains focus or visibility
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        let lastAct = lastActivityTimeRef.current;
+        try {
+          const stored = localStorage.getItem('meeting_app_last_activity');
+          if (stored) {
+            const parsed = parseInt(stored, 10);
+            if (!isNaN(parsed) && parsed > lastAct) {
+              lastAct = parsed;
+              lastActivityTimeRef.current = parsed;
+            }
+          }
+        } catch (_) {}
+
+        if (Date.now() - lastAct >= INACTIVITY_TIMEOUT_MS) {
+          handleLogout('ออกจากระบบอัตโนมัติ เนื่องจากไม่มีการใช้งานระบบเกิน 1 นาที', true);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
+    return () => {
+      activityEvents.forEach((evt) => {
+        window.removeEventListener(evt, markUserActivity);
+      });
+      clearInterval(intervalTimer);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+    };
+  }, [currentUser, handleLogout]);
+
+  // --- Multi-Tab State Synchronization (Auth, Inactivity & Notifications) ---
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      // 1. Cross-Tab Auth Signal (Login / Logout across tabs)
+      if (e.key === 'meeting_app_auth_signal' && e.newValue) {
+        try {
+          const payload = JSON.parse(e.newValue);
+          if (payload.type === 'LOGOUT') {
+            if (currentUserRef.current) {
+              setCurrentUser(null);
+              setIsAuthenticated(false);
+              setIsAdminMode(false);
+              setIsBookingModalOpen(false);
+              setIsBlockModalOpen(false);
+              setEditingBooking(null);
+              setViewingBooking(null);
+              if (payload.isAuto) {
+                setLoginModalReason('ออกจากระบบอัตโนมัติเนื่องจากไม่มีการใช้งานเกิน 1 นาที (ซิงค์จากแท็บอื่น)');
+                setIsSsoModalOpen(true);
+                showToast('ออกจากระบบอัตโนมัติเนื่องจากไม่มีการใช้งานระบบเกิน 1 นาที (ซิงค์จากแท็บอื่น)', 'warning');
+              } else {
+                setLoginModalReason('เข้าสู่ระบบเพื่อเข้าสู่ระบบจัดการข้อมูลและสิทธิ์');
+                setIsSsoModalOpen(true);
+                showToast(payload.reason || 'ออกจากระบบแล้ว (ซิงค์จากแท็บอื่น)', 'info');
+              }
+            }
+          } else if (payload.type === 'LOGIN' && payload.user) {
+            const newUser: UserAccount = payload.user;
+            if (!currentUserRef.current || currentUserRef.current.username.toLowerCase() !== newUser.username.toLowerCase()) {
+              setCurrentUser(newUser);
+              if (newUser.role === 'admin') {
+                setIsAuthenticated(true);
+                setIsAdminMode(true);
+              }
+              setIsSsoModalOpen(false);
+              setLoginModalReason(null);
+              showToast(`เข้าสู่ระบบสำเร็จ: ${newUser.name} (ซิงค์จากแท็บอื่น)`, 'success');
+            }
+          }
+        } catch (_) {}
+      }
+
+      // 2. Cross-Tab Keep-Alive (Activity in any tab resets idle timer in other tabs)
+      if (e.key === 'meeting_app_last_activity' && e.newValue) {
+        const parsed = parseInt(e.newValue, 10);
+        if (!isNaN(parsed) && parsed > lastActivityTimeRef.current) {
+          lastActivityTimeRef.current = parsed;
+        }
+      }
+
+      // 3. Cross-Tab Notification Badge Synchronization
+      if (e.key === 'meeting_app_notif_sync' && e.newValue && currentUserRef.current) {
+        try {
+          const payload = JSON.parse(e.newValue);
+          if (payload.username === currentUserRef.current.username.toLowerCase()) {
+            if (Array.isArray(payload.readNotificationIds)) {
+              setReadNotificationIds(payload.readNotificationIds);
+            }
+            if (Array.isArray(payload.deletedNotificationIds)) {
+              setDeletedNotificationIds(payload.deletedNotificationIds);
+            }
+          }
+        } catch (_) {}
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   // --- Firestore Real-time Subscriptions & Default Data Initialization ---
   useEffect(() => {
@@ -344,12 +632,22 @@ export default function App() {
       }
     });
 
+    const unsubAuditLogs = subscribeToAuditLogs((cloudLogs) => {
+      if (cloudLogs && cloudLogs.length > 0) {
+        setAuditLogs(cloudLogs);
+        try {
+          localStorage.setItem('meeting_app_audit_logs', JSON.stringify(cloudLogs));
+        } catch (_) {}
+      }
+    });
+
     return () => {
       unsubRooms();
       unsubBookings();
       unsubUsers();
       unsubDepts();
       unsubEmails();
+      unsubAuditLogs();
     };
   }, []);
 
@@ -572,6 +870,14 @@ export default function App() {
       const combined = Array.from(new Set([...prev, ...idsToMark]));
       try {
         localStorage.setItem(`meeting_app_read_notifs_${uname}`, JSON.stringify(combined));
+        localStorage.setItem(
+          'meeting_app_notif_sync',
+          JSON.stringify({
+            username: uname,
+            readNotificationIds: combined,
+            timestamp: Date.now()
+          })
+        );
       } catch (e) {
         console.error('Error saving read notifications locally', e);
       }
@@ -590,6 +896,14 @@ export default function App() {
       const combined = Array.from(new Set([...prev, ...idsToDelete]));
       try {
         localStorage.setItem(`meeting_app_deleted_notifs_${uname}`, JSON.stringify(combined));
+        localStorage.setItem(
+          'meeting_app_notif_sync',
+          JSON.stringify({
+            username: uname,
+            deletedNotificationIds: combined,
+            timestamp: Date.now()
+          })
+        );
       } catch (e) {
         console.error('Error saving deleted notifications locally', e);
       }
@@ -849,6 +1163,14 @@ export default function App() {
 
         const savedBooking = result.booking || updatedData;
         setBookings((prev) => prev.map((b) => (b.id === savedBooking.id ? savedBooking : b)));
+        logActivity({
+          username: currentUser?.username || formData.username || 'user',
+          userFullName: currentUser?.name || formData.requesterName || 'ผู้ใช้งาน',
+          userRole: currentUser?.role || 'employee',
+          department: currentUser?.department || formData.department || '-',
+          actionType: 'UPDATE_BOOKING',
+          actionPerformed: `แก้ไขข้อมูลการจองห้อง: ${formData.topic} (${room.name})`
+        });
         showToast('บันทึกการแก้ไขข้อมูลเรียบร้อยแล้ว', 'success');
         setIsBookingModalOpen(false);
         setEditingBooking(null);
@@ -909,6 +1231,15 @@ export default function App() {
         const newMails = createEmailNotifications(newBooking, 'RECEIVED', rooms, undefined, users);
         setEmailNotifications((prev) => [...newMails, ...prev]);
 
+        logActivity({
+          username: currentUser?.username || formData.username || 'user',
+          userFullName: currentUser?.name || formData.requesterName || 'ผู้ใช้งาน',
+          userRole: currentUser?.role || 'employee',
+          department: currentUser?.department || formData.department || '-',
+          actionType: 'CREATE_BOOKING',
+          actionPerformed: `ส่งคำขอจองห้องประชุม: ${formData.topic} (${room.name})`
+        });
+
         showToast(`ส่งคำขอจองเรียบร้อย รหัส ${newBooking.id} (รอการอนุมัติและส่งอีเมลแจ้งเตือนแล้ว)`, 'success');
         setIsBookingModalOpen(false);
         setEditingBooking(null);
@@ -966,6 +1297,15 @@ export default function App() {
     const newMails = createEmailNotifications(updated, 'APPROVED', rooms, undefined, users);
     setEmailNotifications((prev) => [...newMails, ...prev]);
 
+    logActivity({
+      username: currentUser?.username || 'admin',
+      userFullName: currentUser?.name || 'ผู้ดูแลระบบ',
+      userRole: currentUser?.role || 'admin',
+      department: currentUser?.department || '-',
+      actionType: 'APPROVE_BOOKING',
+      actionPerformed: `อนุมัติคำขอจองห้อง: ${target.topic}`
+    });
+
     showToast(`อนุมัติการจอง "${target.topic}" เรียบร้อยแล้ว พร้อมส่งอีเมลแจ้งเตือน`, 'success');
     if (viewingBooking?.id === targetId) {
       setViewingBooking(updated);
@@ -995,6 +1335,15 @@ export default function App() {
     // Send email notification (REJECTED)
     const newMails = createEmailNotifications(updated, 'REJECTED', rooms, reason, users);
     setEmailNotifications((prev) => [...newMails, ...prev]);
+
+    logActivity({
+      username: currentUser?.username || 'admin',
+      userFullName: currentUser?.name || 'ผู้ดูแลระบบ',
+      userRole: currentUser?.role || 'admin',
+      department: currentUser?.department || '-',
+      actionType: 'REJECT_BOOKING',
+      actionPerformed: `ปฏิเสธคำขอจองห้อง: ${target.topic} (เหตุผล: ${reason || 'ไม่ได้ระบุ'})`
+    });
 
     showToast(`ปฏิเสธคำขอจอง "${target.topic}" เรียบร้อยแล้ว พร้อมส่งอีเมลแจ้งเหตุผล`, 'info');
     setIsRejectModalOpen(false);
@@ -1030,6 +1379,15 @@ export default function App() {
     // Trigger CANCELLED email
     const newMails = createEmailNotifications(updated, 'CANCELLED', rooms, reason, users);
     setEmailNotifications((prev) => [...newMails, ...prev]);
+
+    logActivity({
+      username: currentUser?.username || b.username || 'user',
+      userFullName: currentUser?.name || b.requesterName || 'ผู้ใช้งาน',
+      userRole: currentUser?.role || 'employee',
+      department: currentUser?.department || b.department || '-',
+      actionType: 'CANCEL_BOOKING',
+      actionPerformed: `ยกเลิกการจองห้อง: ${b.topic} (เหตุผล: ${reason || 'ไม่ได้ระบุ'})`
+    });
 
     setIsCancelModalOpen(false);
     setTargetCancelBooking(null);
@@ -1243,10 +1601,26 @@ export default function App() {
     if (userToSave.status === 'pending') {
       const regEmails = createUserRegistrationEmails(userToSave, users);
       setEmailNotifications((prev) => [...regEmails, ...prev]);
+      logActivity({
+        username: userToSave.username,
+        userFullName: userToSave.name,
+        userRole: userToSave.role,
+        department: userToSave.department,
+        actionType: 'USER_MANAGEMENT',
+        actionPerformed: `ยื่นคำขอลงทะเบียนผู้ใช้งานใหม่: ${userToSave.name} (@${userToSave.username}) ฝ่าย: ${userToSave.department || '-'}`
+      });
       showToast(`ลงทะเบียนคำขอสำหรับ "${newUser.name}" เรียบร้อยแล้ว ระบบได้ส่งอีเมลตอบรับไปยังคุณและส่งอีเมลแจ้งเตือนไปยัง Super Admin`, 'success');
     } else if (userToSave.status === 'approved') {
       const apprEmails = createUserApprovalEmails(userToSave, currentUser?.name || 'ผู้ดูแลระบบ', users);
       setEmailNotifications((prev) => [...apprEmails, ...prev]);
+      logActivity({
+        username: currentUser?.username || 'admin',
+        userFullName: currentUser?.name || 'Super Admin',
+        userRole: currentUser?.role || 'admin',
+        department: currentUser?.department || '-',
+        actionType: 'USER_MANAGEMENT',
+        actionPerformed: `เพิ่มบัญชีผู้ใช้งานใหม่โดยตรง: ${userToSave.name} (@${userToSave.username}) สิทธิ์: ${userToSave.role}`
+      });
       showToast(`เพิ่มผู้ใช้งาน "${newUser.name}" และส่งอีเมลยืนยันการอนุมัติเรียบร้อยแล้ว`, 'success');
     } else {
       showToast(`บันทึกข้อมูลผู้ใช้งาน "${newUser.name}" เรียบร้อยแล้ว`, 'success');
@@ -1277,6 +1651,16 @@ export default function App() {
     // Create system notification email for the approved user & Super Admin
     const approvalEmails = createUserApprovalEmails(updatedUser, approvedBy, users);
     setEmailNotifications((prev) => [...approvalEmails, ...prev]);
+
+    logActivity({
+      username: currentUser?.username || 'admin',
+      userFullName: currentUser?.name || 'Super Admin',
+      userRole: currentUser?.role || 'admin',
+      department: currentUser?.department || '-',
+      actionType: 'USER_MANAGEMENT',
+      actionPerformed: `อนุมัติคำขอลงทะเบียนผู้ใช้งาน: ${target.name} (@${target.username})`
+    });
+
     showToast(`อนุมัติคำขอใช้งานของ "${target.name}" เรียบร้อยแล้ว ระบบส่งอีเมลตอบรับยืนยันเรียบร้อย`, 'success');
   };
 
@@ -1297,6 +1681,16 @@ export default function App() {
     // Send rejection email to user
     const rejEmail = createUserRejectionEmail(updatedUser, rejectionReason);
     setEmailNotifications((prev) => [rejEmail, ...prev]);
+
+    logActivity({
+      username: currentUser?.username || 'admin',
+      userFullName: currentUser?.name || 'Super Admin',
+      userRole: currentUser?.role || 'admin',
+      department: currentUser?.department || '-',
+      actionType: 'USER_MANAGEMENT',
+      actionPerformed: `ปฏิเสธคำขอลงทะเบียนผู้ใช้: ${target.name} (@${target.username}) (เหตุผล: ${rejectionReason})`
+    });
+
     showToast(`ปฏิเสธคำขอสมัครของ "${target.name || username}" และส่งอีเมลแจ้งผลเรียบร้อยแล้ว`, 'info');
   };
 
@@ -1357,6 +1751,15 @@ export default function App() {
         // 1. ลบบัญชีผู้ใช้จาก users state และ Firestore
         setUsers((prev) => prev.filter((u) => u.username !== username));
         deleteUserFromFirestore(target.id || target.username).catch(console.warn);
+
+        logActivity({
+          username: currentUser?.username || 'admin',
+          userFullName: currentUser?.name || 'Super Admin',
+          userRole: currentUser?.role || 'admin',
+          department: currentUser?.department || '-',
+          actionType: 'USER_MANAGEMENT',
+          actionPerformed: `ลบบัญชีผู้ใช้งานออกจากระบบ: ${target.name} (@${target.username})`
+        });
 
         // 2. คงประวัติการจองทั้งหมด และทำเครื่องหมาย requesterAccountStatus: 'deleted'
         if (userBookings.length > 0) {
@@ -1419,6 +1822,14 @@ export default function App() {
     }
 
     const roleName = role === 'admin' ? 'Super Admin' : role === 'manager' ? 'Admin' : 'User';
+    logActivity({
+      username: currentUser?.username || 'admin',
+      userFullName: currentUser?.name || 'Super Admin',
+      userRole: currentUser?.role || 'admin',
+      department: currentUser?.department || '-',
+      actionType: 'USER_MANAGEMENT',
+      actionPerformed: `ปรับระดับสิทธิ์ของ ${target.name || username} เป็น ${roleName}`
+    });
     showToast(`ปรับระดับสิทธิ์ของ "${target.name || username}" เป็น ${roleName} เรียบร้อยแล้ว`, 'success');
   };
 
@@ -1522,12 +1933,14 @@ export default function App() {
               className={`px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs sm:text-sm font-bold text-white pointer-events-auto border border-white/20 ${
                 toast.type === 'error'
                   ? 'bg-red-600'
-                  : toast.type === 'info'
-                    ? 'bg-blue-600'
-                    : 'bg-emerald-600'
+                  : toast.type === 'warning'
+                    ? 'bg-amber-600'
+                    : toast.type === 'info'
+                      ? 'bg-blue-600'
+                      : 'bg-emerald-600'
               }`}
             >
-              {toast.type === 'error' ? (
+              {toast.type === 'error' || toast.type === 'warning' ? (
                 <AlertCircle size={18} />
               ) : toast.type === 'info' ? (
                 <MailIcon size={18} />
@@ -1568,8 +1981,13 @@ export default function App() {
             users={users}
             departments={departments}
             onRegisterUser={handleRegisterUser}
-            reason="เข้าสู่ระบบเพื่อเข้าสู่ระบบจัดการข้อมูลและสิทธิ์"
+            reason={loginModalReason || 'เข้าสู่ระบบเพื่อเข้าสู่ระบบจัดการข้อมูลและสิทธิ์'}
             onLoginSuccess={(u) => {
+              const now = Date.now();
+              lastActivityTimeRef.current = now;
+              try {
+                localStorage.setItem('meeting_app_last_activity', String(now));
+              } catch (_) {}
               setCurrentUser(u);
               try {
                 sessionStorage.setItem('meeting_app_sso_user', JSON.stringify(u));
@@ -1579,6 +1997,7 @@ export default function App() {
                 setIsAuthenticated(true);
                 setIsAdminMode(true);
               }
+              recordLoginLog(u, 'หน้าเข้าสู่ระบบหลัก (Portal Login)');
               setIsSsoModalOpen(false);
               showToast(`ยินดีต้อนรับคุณ ${u.name} (${u.department})`, 'success');
               setLoginModalReason(null);
@@ -1603,12 +2022,14 @@ export default function App() {
             className={`px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs sm:text-sm font-bold text-white pointer-events-auto border border-white/20 ${
               toast.type === 'error'
                 ? 'bg-red-600'
-                : toast.type === 'info'
-                  ? 'bg-blue-600'
-                  : 'bg-emerald-600'
+                : toast.type === 'warning'
+                  ? 'bg-amber-600'
+                  : toast.type === 'info'
+                    ? 'bg-blue-600'
+                    : 'bg-emerald-600'
             }`}
           >
-            {toast.type === 'error' ? (
+            {toast.type === 'error' || toast.type === 'warning' ? (
               <AlertCircle size={18} />
             ) : toast.type === 'info' ? (
               <MailIcon size={18} />
@@ -1675,18 +2096,7 @@ export default function App() {
           setIsSsoModalOpen(true);
         }}
         onLogoutUser={() => {
-          setCurrentUser(null);
-          setIsAuthenticated(false);
-          setIsAdminMode(false);
-          try {
-            sessionStorage.removeItem('meeting_app_sso_user');
-            localStorage.removeItem('meeting_app_sso_user');
-            localStorage.removeItem('meeting_app_admin_auth');
-          } catch (_) {}
-          setActivePage('booking');
-          setLoginModalReason('เข้าสู่ระบบเพื่อเข้าสู่ระบบจัดการข้อมูลและสิทธิ์');
-          setIsSsoModalOpen(true);
-          showToast('ออกจากระบบเรียบร้อยแล้ว', 'info');
+          handleLogout('ออกจากระบบเรียบร้อยแล้ว');
         }}
       />
 
@@ -1703,23 +2113,31 @@ export default function App() {
             rooms={rooms}
             users={users}
             departments={departments}
+            auditLogs={auditLogs}
+            onRefreshAuditLogs={() => {
+              subscribeToAuditLogs((fresh) => {
+                if (fresh && fresh.length > 0) setAuditLogs(fresh);
+              });
+            }}
             onAddDepartment={handleAddDepartment}
             onUpdateDepartment={handleUpdateDepartment}
             onDeleteDepartment={handleDeleteDepartment}
             onLogin={(user) => {
+              const now = Date.now();
+              lastActivityTimeRef.current = now;
+              try {
+                localStorage.setItem('meeting_app_last_activity', String(now));
+              } catch (_) {}
               setCurrentUser(user);
               if (user.role === 'admin') {
                 setIsAuthenticated(true);
                 setIsAdminMode(true);
               }
+              recordLoginLog(user, 'หน้าจัดการระบบ (Management Portal)');
               showToast(`ยินดีต้อนรับคุณ ${user.name} (${user.role.toUpperCase()})`, 'success');
             }}
             onLogout={() => {
-              setCurrentUser(null);
-              setIsAuthenticated(false);
-              setIsAdminMode(false);
-              setActivePage('booking');
-              showToast('ออกจากระบบเรียบร้อยแล้ว', 'info');
+              handleLogout('ออกจากระบบเรียบร้อยแล้ว');
             }}
             onApprove={handleApprove}
             onReject={handleRejectClick}
@@ -1943,6 +2361,11 @@ export default function App() {
         onRegisterUser={handleRegisterUser}
         reason={loginModalReason}
         onLoginSuccess={(u) => {
+          const now = Date.now();
+          lastActivityTimeRef.current = now;
+          try {
+            localStorage.setItem('meeting_app_last_activity', String(now));
+          } catch (_) {}
           setCurrentUser(u);
           try {
             sessionStorage.setItem('meeting_app_sso_user', JSON.stringify(u));
@@ -1952,6 +2375,7 @@ export default function App() {
             setIsAuthenticated(true);
             setIsAdminMode(true);
           }
+          recordLoginLog(u, 'หน้าต่างเข้าสู่ระบบ (Login Modal)');
           setIsSsoModalOpen(false);
 
           if (pendingBookingSlot) {
@@ -1980,10 +2404,16 @@ export default function App() {
         onClose={() => setIsAdminLoginModalOpen(false)}
         users={users}
         onSuccess={(adminUser) => {
+          const now = Date.now();
+          lastActivityTimeRef.current = now;
+          try {
+            localStorage.setItem('meeting_app_last_activity', String(now));
+          } catch (_) {}
           setIsAuthenticated(true);
           setIsAdminMode(true);
           const targetAdmin = adminUser || users.find((u) => u.role === 'admin') || CORPORATE_USERS[0];
           setCurrentUser(targetAdmin);
+          recordLoginLog(targetAdmin, 'Admin Login Modal');
           showToast(`เข้าสู่ระบบผู้ดูแลระบบ (Admin) สำเร็จ: ${targetAdmin.name}`, 'success');
         }}
       />

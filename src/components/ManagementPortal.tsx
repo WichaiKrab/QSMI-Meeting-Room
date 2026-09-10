@@ -42,7 +42,7 @@ import {
   UploadCloud,
   UserX
 } from 'lucide-react';
-import { Booking, Room, UserAccount, UserRole, UserStatus, Department } from '../types';
+import { Booking, Room, UserAccount, UserRole, UserStatus, Department, AuditLog } from '../types';
 import { formatThaiDate, formatThaiTime } from '../utils/thaiDate';
 import { formatThaiPhone, normalizeThaiPhoneNumber } from '../utils/phoneUtils';
 import { exportBookingsToCSV } from '../utils/exportUtils';
@@ -52,9 +52,10 @@ import { MyProfileTab } from './MyProfileTab';
 import { DepartmentManagementTab } from './DepartmentManagementTab';
 import { ImportExcelModal } from './ImportExcelModal';
 import { MyBookingsTab } from './MyBookingsTab';
+import { AuditLogTab } from './AuditLogTab';
 
 interface ManagementPortalProps {
-  initialTab?: 'approvals' | 'users' | 'bookings' | 'my_history' | 'rooms' | 'reports' | 'directory' | 'departments' | 'my_profile';
+  initialTab?: 'approvals' | 'users' | 'bookings' | 'my_history' | 'rooms' | 'reports' | 'directory' | 'departments' | 'my_profile' | 'audit_logs';
   currentUser: UserAccount | null;
   isAuthenticated: boolean;
   isAdminMode: boolean;
@@ -62,6 +63,8 @@ interface ManagementPortalProps {
   rooms: Room[];
   users?: UserAccount[];
   departments?: Department[];
+  auditLogs?: AuditLog[];
+  onRefreshAuditLogs?: () => void;
   onLogin: (user: UserAccount) => void;
   onLogout: () => void;
   onApprove: (id: string) => void;
@@ -102,6 +105,8 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
   rooms,
   users = [],
   departments = [],
+  auditLogs = [],
+  onRefreshAuditLogs,
   onLogin,
   onLogout,
   onApprove,
@@ -179,7 +184,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
 
   // Active Management Tab (for View B)
   const [activeTab, setActiveTab] = useState<
-    'approvals' | 'users' | 'bookings' | 'my_history' | 'rooms' | 'reports' | 'directory' | 'departments' | 'my_profile'
+    'approvals' | 'users' | 'bookings' | 'my_history' | 'rooms' | 'reports' | 'directory' | 'departments' | 'my_profile' | 'audit_logs'
   >(() => {
     if (initialTab) return initialTab;
     if (currentUser?.role === 'employee') return 'my_history';
@@ -187,6 +192,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
   });
 
   const isAdmin = currentUser?.role === 'admin' || isAuthenticated;
+  const isSuperAdmin = currentUser?.role === 'admin';
   const isManager = currentUser?.role === 'manager';
 
   // Sync activeTab when initialTab changes
@@ -208,13 +214,16 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
           activeTab === 'users' ||
           activeTab === 'rooms' ||
           activeTab === 'directory' ||
-          activeTab === 'departments'
+          activeTab === 'departments' ||
+          activeTab === 'audit_logs'
         ) {
           setActiveTab('approvals');
         }
+      } else if (!isSuperAdmin && activeTab === 'audit_logs') {
+        setActiveTab('approvals');
       }
     }
-  }, [currentUser, activeTab]);
+  }, [currentUser, activeTab, isSuperAdmin]);
 
   // Search & Filter in Bookings Table
   const [searchTerm, setSearchTerm] = useState('');
@@ -1208,6 +1217,27 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
           >
             <BarChart3 size={16} className={activeTab === 'reports' ? 'text-red-400' : 'text-gray-500'} />
             <span>หน้าสถิติและรายงาน</span>
+          </button>
+        )}
+
+        {/* Tab 9: Audit Logs (ประวัติการเข้าใช้งาน) - Super Admin Only */}
+        {isSuperAdmin && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('audit_logs')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition ${
+              activeTab === 'audit_logs'
+                ? 'bg-[#1a1a1a] text-white shadow-xs'
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            <ShieldCheck size={16} className={activeTab === 'audit_logs' ? 'text-amber-400' : 'text-gray-500'} />
+            <span>ประวัติการเข้าใช้งาน (Audit Log)</span>
+            {auditLogs.length > 0 && (
+              <span className="px-1.5 py-0.2 text-[10px] font-extrabold bg-indigo-600 text-white rounded-full">
+                {auditLogs.length > 99 ? '99+' : auditLogs.length}
+              </span>
+            )}
           </button>
         )}
       </div>
@@ -2697,6 +2727,16 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
             users={users}
             onUpdateProfile={onUpdateProfile || onLogin}
             onViewBooking={onViewBooking}
+          />
+        )}
+
+        {/* ==================================================== */}
+        {/* TAB 9: AUDIT LOGS (SUPER ADMIN ONLY) */}
+        {/* ==================================================== */}
+        {activeTab === 'audit_logs' && isSuperAdmin && (
+          <AuditLogTab
+            logs={auditLogs}
+            onRefreshLogs={onRefreshAuditLogs}
           />
         )}
       </div>
