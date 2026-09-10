@@ -159,14 +159,28 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
       return;
     }
 
+    // Check duplicate username
+    const trimmedUsername = regUsername.trim().toLowerCase();
+    if (users.some((u) => u.username.toLowerCase() === trimmedUsername)) {
+      setRegError(`ชื่อผู้ใช้งาน "${regUsername.trim()}" มีอยู่ในระบบแล้ว กรุณาเลือกชื่ออื่น`);
+      return;
+    }
+
+    // Check duplicate email
+    const trimmedEmail = (regEmail.trim() || `${trimmedUsername}@qsmi.or.th`).toLowerCase();
+    if (users.some((u) => u.email && u.email.trim().toLowerCase() === trimmedEmail)) {
+      setRegError(`อีเมล "${regEmail.trim() || trimmedEmail}" ถูกใช้งานแล้ว ไม่สามารถใช้อีเมลซ้ำกันได้`);
+      return;
+    }
+
     const newUser: UserAccount = {
-      username: regUsername.trim().toLowerCase(),
+      username: trimmedUsername,
       password: regPassword,
       name: regName.trim(),
       department: regDept,
       title: regTitle.trim() || (regRole === 'manager' ? 'ผู้ดูแลระบบ' : 'เจ้าหน้าที่'),
       role: regRole,
-      email: regEmail.trim() || `${regUsername.trim().toLowerCase()}@qsmi.or.th`,
+      email: regEmail.trim() || `${trimmedUsername}@qsmi.or.th`,
       phone: formatThaiPhone(regPhone.trim() || '022520161', '02-252-0161'),
       status: 'pending',
       registeredAt: new Date().toISOString(),
@@ -389,6 +403,18 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
                   onChange={(e) => setRegUsername(e.target.value)}
                   className="w-full p-2.5 border border-gray-300 rounded-xl text-xs sm:text-sm font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-[#C8102E]"
                 />
+                {regUsername.trim().length > 0 && (
+                  (() => {
+                    const isDup = users.some(
+                      (u) => u.username.trim().toLowerCase() === regUsername.trim().toLowerCase()
+                    );
+                    return (
+                      <p className={`text-[11px] mt-1 font-medium ${isDup ? 'text-red-500' : 'text-emerald-600'}`}>
+                        {isDup ? '⚠️ ชื่อผู้ใช้งานนี้มีอยู่ในระบบแล้ว กรุณาเลือกชื่ออื่น' : '✓ สามารถใช้ชื่อผู้ใช้งานนี้ได้'}
+                      </p>
+                    );
+                  })()
+                )}
               </div>
 
               <div>
@@ -542,6 +568,18 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
                   />
                   <Mail size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
                 </div>
+                {regEmail.trim().length > 0 && (
+                  (() => {
+                    const isDup = users.some(
+                      (u) => u.email && u.email.trim().toLowerCase() === regEmail.trim().toLowerCase()
+                    );
+                    return (
+                      <p className={`text-[11px] mt-1 font-medium ${isDup ? 'text-red-500' : 'text-emerald-600'}`}>
+                        {isDup ? '⚠️ อีเมลนี้ถูกใช้งานในระบบแล้ว ไม่สามารถใช้ซ้ำได้' : '✓ สามารถใช้อีเมลนี้ได้'}
+                      </p>
+                    );
+                  })()
+                )}
               </div>
 
               <div>

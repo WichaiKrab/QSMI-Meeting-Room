@@ -361,19 +361,31 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
       return;
     }
 
+    const trimmedUsername = regUsername.trim().toLowerCase();
+    if (users.some((u) => u.username.trim().toLowerCase() === trimmedUsername)) {
+      setLoginError(`ชื่อผู้ใช้งาน "${regUsername.trim()}" มีอยู่ในระบบแล้ว ไม่สามารถใช้ชื่อผู้ใช้งานซ้ำได้ กรุณาเลือกชื่ออื่น`);
+      return;
+    }
+
+    const trimmedEmail = (regEmail.trim() || `${trimmedUsername}@qsmi.or.th`).toLowerCase();
+    if (users.some((u) => u.email && u.email.trim().toLowerCase() === trimmedEmail)) {
+      setLoginError(`อีเมล "${regEmail.trim() || trimmedEmail}" ถูกใช้งานแล้วในระบบ ไม่สามารถใช้อีเมลซ้ำได้`);
+      return;
+    }
+
     if (regPassword && regPassword.length < 8) {
       setLoginError('รหัสผ่านต้องมีความยาวไม่น้อยกว่า 8 ตัวอักษร');
       return;
     }
 
     const newUser: UserAccount = {
-      username: regUsername.trim().toLowerCase(),
+      username: trimmedUsername,
       password: regPassword || '1234',
       name: regName.trim(),
       department: regDept,
       title: regTitle.trim() || 'เจ้าหน้าที่',
       role: regRole,
-      email: regEmail.trim() || `${regUsername.trim().toLowerCase()}@qsmi.or.th`,
+      email: regEmail.trim() || `${trimmedUsername}@qsmi.or.th`,
       phone: formatThaiPhone(regPhone.trim() || '022520161', '02-252-0161'),
       status: 'pending',
       registeredAt: new Date().toISOString(),
@@ -398,14 +410,26 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
     e.preventDefault();
     if (!newAdminUserUsername.trim() || !newAdminUserName.trim()) return;
 
+    const trimmedUsername = newAdminUserUsername.trim().toLowerCase();
+    if (users.some((u) => u.username.toLowerCase() === trimmedUsername)) {
+      alert(`ชื่อผู้ใช้งาน "${newAdminUserUsername.trim()}" มีอยู่ในระบบแล้ว กรุณาเลือกชื่ออื่น`);
+      return;
+    }
+
+    const trimmedEmail = (newAdminUserEmail.trim() || `${trimmedUsername}@qsmi.or.th`).toLowerCase();
+    if (users.some((u) => u.email && u.email.trim().toLowerCase() === trimmedEmail)) {
+      alert(`อีเมล "${newAdminUserEmail.trim() || trimmedEmail}" ถูกใช้งานแล้วในระบบ ไม่สามารถใช้อีเมลซ้ำได้`);
+      return;
+    }
+
     const newUser: UserAccount = {
-      username: newAdminUserUsername.trim().toLowerCase(),
+      username: trimmedUsername,
       password: newAdminUserPassword || '1234',
       name: newAdminUserName.trim(),
       department: newAdminUserDept,
       title: newAdminUserTitle.trim() || 'เจ้าหน้าที่',
       role: newAdminUserRole,
-      email: newAdminUserEmail.trim() || `${newAdminUserUsername.trim().toLowerCase()}@qsmi.or.th`,
+      email: newAdminUserEmail.trim() || `${trimmedUsername}@qsmi.or.th`,
       phone: formatThaiPhone(newAdminUserPhone.trim() || '022520161', '02-252-0161'),
       status: 'approved',
       approvedAt: new Date().toISOString(),
@@ -424,7 +448,11 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
     };
 
     if (onRegisterUser) {
-      onRegisterUser(newUser);
+      const res = onRegisterUser(newUser);
+      if (res && !res.success) {
+        alert(res.message || 'ไม่สามารถเพิ่มผู้ใช้งานได้');
+        return;
+      }
     }
     setIsAddUserModalOpen(false);
     setNewAdminUserName('');
@@ -465,6 +493,20 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
     e.preventDefault();
     if (!editingUser) return;
 
+    const trimmedEmail = editUserEmail.trim();
+    if (trimmedEmail) {
+      const emailExists = users.some(
+        (u) =>
+          u.username.toLowerCase() !== editingUser.username.toLowerCase() &&
+          u.email &&
+          u.email.trim().toLowerCase() === trimmedEmail.toLowerCase()
+      );
+      if (emailExists) {
+        alert(`อีเมล "${trimmedEmail}" มีผู้ใช้งานอื่นในระบบใช้แล้ว ไม่สามารถใช้อีเมลซ้ำได้`);
+        return;
+      }
+    }
+
     const updated: UserAccount = {
       ...editingUser,
       name: editUserName.trim() || editingUser.name,
@@ -472,7 +514,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
       title: editUserTitle.trim(),
       role: editUserRole,
       status: editUserStatus,
-      email: editUserEmail.trim(),
+      email: trimmedEmail,
       phone: formatThaiPhone(editUserPhone.trim(), '') || editUserPhone.trim(),
       password: editUserPassword || editingUser.password || '1234',
       receiveEmailNotifications:
@@ -836,6 +878,18 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                       onChange={(e) => setRegUsername(e.target.value)}
                       className="w-full p-2 border border-gray-300 rounded-xl text-xs font-medium text-gray-900 outline-none focus:ring-2 focus:ring-[#C8102E]"
                     />
+                    {regUsername.trim().length > 0 && (
+                      (() => {
+                        const isDup = users.some(
+                          (u) => u.username.trim().toLowerCase() === regUsername.trim().toLowerCase()
+                        );
+                        return (
+                          <p className={`text-[11px] mt-1 font-medium ${isDup ? 'text-red-500' : 'text-emerald-600'}`}>
+                            {isDup ? '⚠️ ชื่อผู้ใช้งานนี้มีอยู่ในระบบแล้ว กรุณาเลือกชื่ออื่น' : '✓ สามารถใช้ชื่อผู้ใช้งานนี้ได้'}
+                          </p>
+                        );
+                      })()
+                    )}
                   </div>
 
                   <div>
@@ -2612,6 +2666,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
             currentUser={currentUser}
             bookings={bookings}
             rooms={rooms}
+            users={users}
             onUpdateProfile={onUpdateProfile || onLogin}
             onViewBooking={onViewBooking}
           />
@@ -2734,6 +2789,18 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                     onChange={(e) => setNewAdminUserUsername(e.target.value)}
                     className="w-full p-2 border border-gray-300 rounded-xl text-xs font-medium text-gray-900 outline-none focus:ring-2 focus:ring-[#C8102E]"
                   />
+                  {newAdminUserUsername.trim().length > 0 && (
+                    (() => {
+                      const isDup = users.some(
+                        (u) => u.username.trim().toLowerCase() === newAdminUserUsername.trim().toLowerCase()
+                      );
+                      return (
+                        <p className={`text-[10px] mt-1 font-medium ${isDup ? 'text-red-500' : 'text-emerald-600'}`}>
+                          {isDup ? '⚠️ ชื่อเข้าระบบนี้ซ้ำ' : '✓ ใช้ได้'}
+                        </p>
+                      );
+                    })()
+                  )}
                 </div>
 
                 <div>

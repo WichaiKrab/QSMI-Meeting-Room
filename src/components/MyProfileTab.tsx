@@ -26,6 +26,7 @@ interface MyProfileTabProps {
   currentUser: UserAccount;
   bookings: Booking[];
   rooms: Room[];
+  users?: UserAccount[];
   onUpdateProfile: (updatedUser: UserAccount) => void;
   onViewBooking?: (booking: Booking) => void;
 }
@@ -58,6 +59,7 @@ export const MyProfileTab: React.FC<MyProfileTabProps> = ({
   currentUser,
   bookings,
   rooms,
+  users,
   onUpdateProfile,
   onViewBooking
 }) => {
@@ -123,12 +125,26 @@ export const MyProfileTab: React.FC<MyProfileTabProps> = ({
       return;
     }
 
+    const trimmedEmail = email.trim();
+    if (trimmedEmail && users && users.length > 0) {
+      const emailExists = users.some(
+        (u) =>
+          u.username.toLowerCase() !== currentUser.username.toLowerCase() &&
+          u.email &&
+          u.email.trim().toLowerCase() === trimmedEmail.toLowerCase()
+      );
+      if (emailExists) {
+        setErrorMsg(`อีเมล "${trimmedEmail}" ถูกใช้งานโดยบัญชีผู้ใช้อื่นในระบบแล้ว ไม่สามารถใช้อีเมลซ้ำได้`);
+        return;
+      }
+    }
+
     const updated: UserAccount = {
       ...currentUser,
       name: name.trim(),
       department: department.trim(),
       title: title.trim(),
-      email: email.trim(),
+      email: trimmedEmail,
       phone: formatThaiPhone(phone.trim(), '') || phone.trim(),
       avatarColor,
       password: password || currentUser.password || '1234'

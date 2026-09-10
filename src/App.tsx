@@ -1203,16 +1203,30 @@ export default function App() {
 
   // --- User Account Management Handlers (Admin Approval & Registration) ---
   const handleRegisterUser = (newUser: UserAccount) => {
+    const trimmedUsername = newUser.username.trim().toLowerCase();
     const exists = users.some(
-      (u) => u.username.toLowerCase() === newUser.username.toLowerCase()
+      (u) => u.username.trim().toLowerCase() === trimmedUsername
     );
     if (exists) {
       return {
         success: false,
-        message: `ชื่อผู้ใช้งาน "${newUser.username}" มีอยู่ในระบบแล้ว กรุณาเลือกชื่ออื่น`
+        message: `ชื่อผู้ใช้งาน "${newUser.username.trim()}" มีอยู่ในระบบแล้ว ไม่สามารถใช้ชื่อผู้ใช้งานซ้ำได้ กรุณาเลือกชื่ออื่น`
       };
     }
-    const userToSave = { ...newUser, id: newUser.id || newUser.username };
+
+    if (newUser.email) {
+      const emailExists = users.some(
+        (u) => u.email && u.email.trim().toLowerCase() === newUser.email!.trim().toLowerCase()
+      );
+      if (emailExists) {
+        return {
+          success: false,
+          message: `อีเมล "${newUser.email}" มีอยู่ในระบบแล้ว ไม่สามารถใช้อีเมลซ้ำได้`
+        };
+      }
+    }
+
+    const userToSave = { ...newUser, username: trimmedUsername, id: newUser.id || trimmedUsername };
     setUsers((prev) => [userToSave, ...prev]);
     saveUserToFirestore(userToSave).catch(console.warn);
     showToast(`ลงทะเบียนคำขอสำหรับ "${newUser.name}" เรียบร้อยแล้ว รอผู้ดูแลระบบอนุมัติ`, 'success');
