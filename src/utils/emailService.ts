@@ -337,7 +337,9 @@ export const createEmailNotifications = (
   const meetingFormat =
     booking.meetingType === 'Online'
       ? `Online ${booking.meetingLink ? `(Link: ${booking.meetingLink})` : ''}`
-      : 'Onsite';
+      : booking.meetingType === 'Hybrid'
+        ? `Hybrid (ผสมผสาน) ${booking.meetingLink ? `(Link: ${booking.meetingLink})` : ''}`
+        : 'Onsite';
 
   const cateringInfo = `อาหารว่าง: ${booking.snacks || '-'} ชุด, กลางวัน: ${booking.lunch || '-'} กล่อง, เครื่องดื่ม: ${booking.drinks || '-'} ขวด`;
   const equipmentStr = Array.isArray(booking.equipment)

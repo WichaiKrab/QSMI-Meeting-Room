@@ -71,7 +71,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const [drinks, setDrinks] = useState<number | ''>('');
   const [equipment, setEquipment] = useState<string[]>([]);
   const [seatingSetup, setSeatingSetup] = useState<string>('');
-  const [meetingType, setMeetingType] = useState<'Onsite' | 'Online'>('Onsite');
+  const [meetingType, setMeetingType] = useState<'Onsite' | 'Online' | 'Hybrid'>('Onsite');
   const [note, setNote] = useState('');
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
 
@@ -889,12 +889,12 @@ export const BookingModal: React.FC<BookingModalProps> = ({
             </div>
           </div>
 
-          {/* Meeting Format (Onsite / Online - without link input) */}
+          {/* Meeting Format (Onsite / Online / Hybrid) */}
           <div>
             <label className="block text-xs sm:text-sm font-bold text-gray-700 mb-1.5">
               รูปแบบการประชุม <span className="text-red-500">*</span>
             </label>
-            <div className="flex items-center gap-4 sm:gap-6 bg-gray-50 p-3 sm:p-3.5 rounded-2xl border border-gray-200">
+            <div className="flex flex-wrap items-center gap-4 sm:gap-6 bg-gray-50 p-3 sm:p-3.5 rounded-2xl border border-gray-200">
               <label className="flex items-center gap-2.5 cursor-pointer text-xs sm:text-sm font-bold text-gray-700 hover:text-gray-900 transition">
                 <input
                   type="radio"
@@ -916,6 +916,17 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   className="w-4 h-4 text-[#C8102E] focus:ring-[#C8102E]"
                 />
                 <span>Online (ประชุมทางไกล)</span>
+              </label>
+              <label className="flex items-center gap-2.5 cursor-pointer text-xs sm:text-sm font-bold text-gray-700 hover:text-gray-900 transition">
+                <input
+                  type="radio"
+                  name="meetingType"
+                  value="Hybrid"
+                  checked={meetingType === 'Hybrid'}
+                  onChange={() => setMeetingType('Hybrid')}
+                  className="w-4 h-4 text-[#C8102E] focus:ring-[#C8102E]"
+                />
+                <span>Hybrid (ผสมผสาน)</span>
               </label>
             </div>
           </div>

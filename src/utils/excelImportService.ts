@@ -253,7 +253,7 @@ export const downloadBookingTemplate = (rooms: Room[]) => {
     'เครื่องดื่ม (แก้ว/ขวด)',
     'อุปกรณ์ที่ขอใช้',
     'รูปแบบการจัดโต๊ะ',
-    'รูปแบบการประชุม (Onsite/Online)',
+    'รูปแบบการประชุม (Onsite/Online/Hybrid)',
     'หมายเหตุ/รายละเอียดเพิ่มเติม'
   ];
 
@@ -398,7 +398,7 @@ export const downloadBookingCsvTemplate = (rooms: Room[]) => {
     'เครื่องดื่ม (แก้ว/ขวด)',
     'อุปกรณ์ที่ขอใช้',
     'รูปแบบการจัดโต๊ะ',
-    'รูปแบบการประชุม (Onsite/Online)',
+    'รูปแบบการประชุม (Onsite/Online/Hybrid)',
     'หมายเหตุ/รายละเอียดเพิ่มเติม'
   ];
 
@@ -644,7 +644,12 @@ export const parseAndValidateImportFile = async (
     const drinks = parseInt(getVal(colIdx.drinks), 10) || 0;
     const equipmentStr = getVal(colIdx.equipment);
     const seatingSetup = getVal(colIdx.seatingSetup);
-    const meetingType = getVal(colIdx.meetingType).toLowerCase().includes('online') ? 'Online' : 'Onsite';
+    const rawMeetingType = getVal(colIdx.meetingType).toLowerCase();
+    const meetingType: 'Onsite' | 'Online' | 'Hybrid' = rawMeetingType.includes('hybrid')
+      ? 'Hybrid'
+      : rawMeetingType.includes('online')
+        ? 'Online'
+        : 'Onsite';
     const note = getVal(colIdx.note);
 
     // Validation 1: Required Topic

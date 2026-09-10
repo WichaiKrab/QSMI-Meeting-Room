@@ -278,7 +278,11 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
                 รูปแบบ
               </span>
               <div className="font-semibold text-gray-800">
-                {booking.meetingType === 'Online' ? 'Online (ประชุมทางไกล)' : 'Onsite (ที่ห้องประชุม)'}
+                {booking.meetingType === 'Online'
+                  ? 'Online (ประชุมทางไกล)'
+                  : booking.meetingType === 'Hybrid'
+                    ? 'Hybrid (ผสมผสาน)'
+                    : 'Onsite (ที่ห้องประชุม)'}
               </div>
             </div>
           </div>
@@ -292,7 +296,7 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
             </div>
           )}
 
-          {booking.meetingType === 'Online' && booking.meetingLink && (
+          {(booking.meetingType === 'Online' || booking.meetingType === 'Hybrid') && booking.meetingLink && (
             <div className="p-3 bg-blue-50 rounded-xl border border-blue-200">
               <span className="text-xs font-bold text-blue-900 block mb-1 flex items-center gap-1">
                 <Video size={14} /> ลิงก์ห้องประชุมออนไลน์:

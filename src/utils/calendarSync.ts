@@ -27,7 +27,7 @@ export const generateGoogleCalendarUrl = (booking: Booking, room?: Room): string
     `อีเมล: ${booking.email || '-'}`,
     `จำนวนผู้เข้าร่วม: ${booking.participants || 1} ท่าน`,
     booking.institute ? `สถาบันเข้าร่วม: ${booking.institute}` : '',
-    booking.meetingType === 'Online' && booking.meetingLink ? `ลิงก์การประชุม: ${booking.meetingLink}` : '',
+    booking.meetingType !== 'Onsite' && booking.meetingLink ? `ลิงก์การประชุม: ${booking.meetingLink}` : '',
     booking.seatingSetup ? `การจัดโต๊ะ: ${booking.seatingSetup}` : '',
     '---',
     'สร้างโดย: ระบบจองห้องประชุมออนไลน์ (สถานเสาวภา สภากาชาดไทย)'
@@ -55,7 +55,7 @@ export const downloadIcsFile = (booking: Booking, room?: Room) => {
     `ห้องประชุม: ${roomName}`,
     `ผู้จอง: ${booking.requesterName} (${booking.department || '-'})`,
     `เบอร์โทร: ${booking.phone || '-'}`,
-    booking.meetingType === 'Online' && booking.meetingLink ? `ลิงก์: ${booking.meetingLink}` : ''
+    booking.meetingType !== 'Onsite' && booking.meetingLink ? `ลิงก์: ${booking.meetingLink}` : ''
   ]
     .filter(Boolean)
     .join('\\n');

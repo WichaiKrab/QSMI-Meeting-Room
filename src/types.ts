@@ -38,7 +38,7 @@ export interface Booking {
   lunch?: number;
   drinks?: number;
   equipment?: string[] | string;
-  meetingType: 'Onsite' | 'Online';
+  meetingType: 'Onsite' | 'Online' | 'Hybrid';
   onlineLinkType?: string;
   meetingLink?: string;
   seatingSetup?: 'Classroom' | 'Meeting (U)' | 'จัดเลี้ยงพระ' | '' | string;
