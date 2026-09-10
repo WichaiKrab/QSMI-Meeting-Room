@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Lock, AlertCircle, Ban, AlertTriangle, Send, Check, User, Eye, EyeOff } from 'lucide-react';
+import { X, Lock, AlertCircle, Ban, AlertTriangle, Send, Check, User, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { Booking, Room, UserAccount } from '../types';
 import { CORPORATE_USERS } from '../data/initialData';
 import { isBookingInPast } from '../utils/thaiDate';
@@ -520,6 +520,7 @@ export interface DeleteConfirmModalProps {
   confirmText?: string;
   cancelText?: string;
   onConfirm: () => void;
+  notice?: React.ReactNode;
 }
 
 export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
@@ -530,7 +531,8 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
   itemDetails = [],
   confirmText = 'ยืนยันการลบข้อมูล',
   cancelText = 'ยกเลิก',
-  onConfirm
+  onConfirm,
+  notice
 }) => {
   if (!isOpen) return null;
 
@@ -575,6 +577,13 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
                 <span className="font-bold text-gray-900 text-right break-words">{item.value}</span>
               </div>
             ))}
+          </div>
+        )}
+
+        {notice && (
+          <div className="bg-emerald-50/90 border border-emerald-200 rounded-2xl p-3.5 text-xs text-emerald-900 flex items-start gap-2.5 leading-relaxed">
+            <ShieldCheck size={18} className="text-emerald-600 shrink-0 mt-0.5" />
+            <div className="flex-1">{notice}</div>
           </div>
         )}
 

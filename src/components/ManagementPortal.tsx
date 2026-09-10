@@ -39,12 +39,14 @@ import {
   User,
   ChevronDown,
   ChevronUp,
-  UploadCloud
+  UploadCloud,
+  UserX
 } from 'lucide-react';
 import { Booking, Room, UserAccount, UserRole, UserStatus, Department } from '../types';
 import { formatThaiDate, formatThaiTime } from '../utils/thaiDate';
 import { formatThaiPhone, normalizeThaiPhoneNumber } from '../utils/phoneUtils';
 import { exportBookingsToCSV } from '../utils/exportUtils';
+import { isBookingRequesterDeleted } from '../utils/bookingUserUtils';
 import { AdminReports } from './AdminReports';
 import { MyProfileTab } from './MyProfileTab';
 import { DepartmentManagementTab } from './DepartmentManagementTab';
@@ -1270,7 +1272,14 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                               <strong>วัน/เวลา:</strong> {formatThaiDate(bStart, { day: 'numeric', month: 'short', year: 'numeric' })}{' '}
                               ({formatThaiTime(bStart, { hour: '2-digit', minute: '2-digit' })} - {formatThaiTime(bEnd, { hour: '2-digit', minute: '2-digit' })} น.)
                             </div>
-                            <div><strong>ผู้ขอจอง:</strong> {b.requesterName}</div>
+                            <div>
+                              <strong>ผู้ขอจอง:</strong> {b.requesterName}
+                              {isBookingRequesterDeleted(b, users) && (
+                                <span className="ml-1.5 inline-block px-1.5 py-0.2 rounded text-[10px] font-semibold bg-gray-100 text-gray-700 border border-gray-300">
+                                  อดีตผู้ใช้งาน
+                                </span>
+                              )}
+                            </div>
                             <div><strong>ฝ่าย:</strong> {b.department}</div>
                             {b.phone && <div><strong>โทร:</strong> {formatThaiPhone(b.phone)}</div>}
                           </div>
@@ -2181,7 +2190,15 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                         <div className="flex items-start gap-1.5 pt-1 border-t border-gray-200/60">
                           <Users size={13} className="text-gray-400 shrink-0 mt-0.5" />
                           <div>
-                            <span className="font-semibold text-gray-900">{b.requesterName}</span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-semibold text-gray-900">{b.requesterName}</span>
+                              {isBookingRequesterDeleted(b, users) && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-gray-100 text-gray-700 border border-gray-300">
+                                  <UserX size={10} className="text-gray-500" />
+                                  อดีตผู้ใช้งาน
+                                </span>
+                              )}
+                            </div>
                             <span className="text-gray-500 text-[11px] block">{b.department}</span>
                           </div>
                         </div>
@@ -2314,7 +2331,18 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                           </td>
 
                           <td className="p-3">
-                            <div className="font-medium text-gray-800">{b.requesterName}</div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-medium text-gray-800">{b.requesterName}</span>
+                              {isBookingRequesterDeleted(b, users) && (
+                                <span
+                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-semibold bg-gray-100 text-gray-700 border border-gray-300"
+                                  title="บัญชีผู้ใช้งานนี้พ้นสภาพหรือถูกลบออกจากระบบแล้ว แต่ประวัติการจองยังคงถูกเก็บรักษาไว้"
+                                >
+                                  <UserX size={10} className="text-gray-500" />
+                                  อดีตผู้ใช้งาน
+                                </span>
+                              )}
+                            </div>
                             <div className="text-[11px] text-gray-500">{b.department}</div>
                           </td>
 

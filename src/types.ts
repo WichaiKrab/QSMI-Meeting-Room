@@ -52,6 +52,7 @@ export interface Booking {
   syncedToGoogleCalendar?: boolean;
   isImported?: boolean;
   suppressEmail?: boolean;
+  requesterAccountStatus?: 'active' | 'deleted';
 }
 
 export interface UserAccount {

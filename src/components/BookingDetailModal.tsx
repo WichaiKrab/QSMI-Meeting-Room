@@ -16,13 +16,15 @@ import {
   Send,
   ExternalLink,
   Trash2,
-  Edit3
+  Edit3,
+  UserX
 } from 'lucide-react';
 import { Room, Booking, UserAccount } from '../types';
 import { formatThaiDate, formatThaiTime, isBookingInPast } from '../utils/thaiDate';
 import { generateGoogleCalendarUrl, downloadIcsFile } from '../utils/calendarSync';
 import { normalizeEquipmentName, normalizeSeatingName } from '../data/initialData';
 import { formatThaiPhone } from '../utils/phoneUtils';
+import { isBookingRequesterDeleted } from '../utils/bookingUserUtils';
 
 interface BookingDetailModalProps {
   isOpen: boolean;
@@ -31,6 +33,7 @@ interface BookingDetailModalProps {
   rooms: Room[];
   isAdminMode: boolean;
   currentUser: UserAccount | null;
+  users?: UserAccount[];
   onApprove?: (booking: Booking) => void;
   onReject?: (booking: Booking) => void;
   onEditClick?: (booking: Booking) => void;
@@ -47,6 +50,7 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
   rooms,
   isAdminMode,
   currentUser,
+  users,
   onApprove,
   onReject,
   onEditClick,
@@ -72,6 +76,7 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
   const isRejected = booking.status === 'rejected';
   const isCancelled = booking.status === 'cancelled';
   const isBlocked = booking.isBlocked;
+  const isDeletedRequester = isBookingRequesterDeleted(booking, users);
 
   let statusBadge = (
     <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200">
@@ -210,8 +215,22 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
               <span className="text-xs font-bold text-gray-400 uppercase block mb-0.5">
                 ผู้จอง / แผนก
               </span>
-              <div className="font-bold text-gray-800">{booking.requesterName}</div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="font-bold text-gray-800">{booking.requesterName}</span>
+                {isDeletedRequester && (
+                  <span
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-700 border border-gray-300"
+                    title="บัญชีผู้ใช้งานนี้พ้นสภาพหรือถูกลบออกจากระบบแล้ว แต่ประวัติการจองยังคงถูกเก็บรักษาไว้"
+                  >
+                    <UserX size={10} className="text-gray-500" />
+                    อดีตผู้ใช้งาน / พ้นสภาพ
+                  </span>
+                )}
+              </div>
               <div className="text-xs text-gray-500">{booking.department || '-'}</div>
+              {booking.username && (
+                <div className="text-[11px] text-gray-400">@{booking.username}</div>
+              )}
             </div>
             <div>
               <span className="text-xs font-bold text-gray-400 uppercase block mb-0.5">
@@ -230,6 +249,19 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
               )}
             </div>
           </div>
+
+          {/* Former User Notice */}
+          {isDeletedRequester && (
+            <div className="bg-amber-50/80 border border-amber-200/90 rounded-2xl p-3 text-xs text-amber-900 flex items-start gap-2.5">
+              <UserX size={16} className="text-amber-600 shrink-0 mt-0.5" />
+              <div className="leading-relaxed">
+                <div className="font-bold text-amber-950">สถานะบัญชีผู้ขอจอง: อดีตผู้ใช้งาน / พ้นสภาพ</div>
+                <div className="text-[11px] text-amber-800 mt-0.5">
+                  บัญชีผู้ใช้งานนี้ถูกลบออกจากระบบแล้ว แต่ประวัติและรายละเอียดการจองห้องประชุมยังคงถูกเก็บรักษาไว้ในระบบอย่างสมบูรณ์เพื่อการตรวจสอบย้อนหลัง
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* External Institute & Format */}
           <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100">

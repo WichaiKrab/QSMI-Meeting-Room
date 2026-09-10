@@ -16,7 +16,13 @@ import {
   normalizeSeatingName,
   normalizeEquipmentName
 } from './data/initialData';
-import { createEmailNotifications } from './utils/emailService';
+import {
+  createEmailNotifications,
+  createUserRegistrationEmails,
+  createUserApprovalEmail,
+  createUserApprovalEmails,
+  createUserRejectionEmail
+} from './utils/emailService';
 import { checkBookingOverlap, formatThaiDate, formatThaiTime, isBookingInPast, SELECTABLE_TIMES } from './utils/thaiDate';
 import {
   initializeFirestoreDefaults,
@@ -256,6 +262,7 @@ export default function App() {
     title: string;
     description: string;
     itemDetails?: { label: string; value: string }[];
+    notice?: React.ReactNode;
     onConfirm: () => void;
   }>({
     isOpen: false,
@@ -1229,7 +1236,22 @@ export default function App() {
     const userToSave = { ...newUser, username: trimmedUsername, id: newUser.id || trimmedUsername };
     setUsers((prev) => [userToSave, ...prev]);
     saveUserToFirestore(userToSave).catch(console.warn);
-    showToast(`ลงทะเบียนคำขอสำหรับ "${newUser.name}" เรียบร้อยแล้ว รอผู้ดูแลระบบอนุมัติ`, 'success');
+
+    // Trigger registration emails:
+    // 1) When user registers with pending approval: email to user + email to admins
+    // 2) When user is registered with approved status (e.g. by admin): approval welcome email
+    if (userToSave.status === 'pending') {
+      const regEmails = createUserRegistrationEmails(userToSave, users);
+      setEmailNotifications((prev) => [...regEmails, ...prev]);
+      showToast(`ลงทะเบียนคำขอสำหรับ "${newUser.name}" เรียบร้อยแล้ว ระบบได้ส่งอีเมลตอบรับไปยังคุณและส่งอีเมลแจ้งเตือนไปยัง Super Admin`, 'success');
+    } else if (userToSave.status === 'approved') {
+      const apprEmails = createUserApprovalEmails(userToSave, currentUser?.name || 'ผู้ดูแลระบบ', users);
+      setEmailNotifications((prev) => [...apprEmails, ...prev]);
+      showToast(`เพิ่มผู้ใช้งาน "${newUser.name}" และส่งอีเมลยืนยันการอนุมัติเรียบร้อยแล้ว`, 'success');
+    } else {
+      showToast(`บันทึกข้อมูลผู้ใช้งาน "${newUser.name}" เรียบร้อยแล้ว`, 'success');
+    }
+
     return { success: true };
   };
 
@@ -1252,30 +1274,10 @@ export default function App() {
     );
     saveUserToFirestore(updatedUser).catch(console.warn);
 
-    // Create system notification email for the approved user
-    const approvalEmail: EmailNotification = {
-      id: `mail-appr-${Date.now()}`,
-      bookingId: 'USER-APPROVAL',
-      recipient: target.email || `${target.username}@qsmi.or.th`,
-      subject: `[สถานเสาวภา] บัญชีผู้ใช้งานของคุณได้รับการอนุมัติเรียบร้อยแล้ว`,
-      bodyText: `เรียน ${target.name}, บัญชีของคุณได้รับการอนุมัติเรียบร้อยแล้ว`,
-      htmlBody: `
-        <div style="font-family: sans-serif; line-height: 1.6; color: #333;">
-          <h2 style="color: #059669;">ยินดีต้อนรับสู่ระบบจองห้องประชุม สถานเสาวภา สภากาชาดไทย</h2>
-          <p>เรียน <strong>${target.name}</strong>,</p>
-          <p>คำขอเปิดใช้งานบัญชีผู้ใช้งานของคุณ (ชื่อผู้ใช้: <strong>${target.username}</strong>, สิทธิ์: <strong>${target.role.toUpperCase()}</strong>, ฝ่าย: <strong>${target.department}</strong>) ได้รับการพิจารณา<strong>อนุมัติ</strong>โดยผู้ดูแลระบบแล้ว</p>
-          <p>ขณะนี้คุณสามารถเข้าสู่ระบบและเริ่มจองห้องประชุมได้ทันที</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-          <p style="font-size: 12px; color: #888;">สถานเสาวภา สภากาชาดไทย • ระบบจองห้องประชุมส่วนกลาง</p>
-        </div>
-      `,
-      type: 'APPROVED',
-      sentAt: new Date().toISOString(),
-      isRead: false,
-      isAdminNotice: false
-    };
-    setEmailNotifications((prev) => [approvalEmail, ...prev]);
-    showToast(`อนุมัติคำขอใช้งานของ "${target.name}" เรียบร้อยแล้ว`, 'success');
+    // Create system notification email for the approved user & Super Admin
+    const approvalEmails = createUserApprovalEmails(updatedUser, approvedBy, users);
+    setEmailNotifications((prev) => [...approvalEmails, ...prev]);
+    showToast(`อนุมัติคำขอใช้งานของ "${target.name}" เรียบร้อยแล้ว ระบบส่งอีเมลตอบรับยืนยันเรียบร้อย`, 'success');
   };
 
   const handleRejectUser = (username: string, reason?: string) => {
@@ -1291,17 +1293,33 @@ export default function App() {
       prev.map((u) => (u.username === username ? updatedUser : u))
     );
     saveUserToFirestore(updatedUser).catch(console.warn);
-    showToast(`ปฏิเสธคำขอสมัครของ "${target.name || username}" เรียบร้อยแล้ว`, 'info');
+
+    // Send rejection email to user
+    const rejEmail = createUserRejectionEmail(updatedUser, rejectionReason);
+    setEmailNotifications((prev) => [rejEmail, ...prev]);
+    showToast(`ปฏิเสธคำขอสมัครของ "${target.name || username}" และส่งอีเมลแจ้งผลเรียบร้อยแล้ว`, 'info');
   };
 
   const handleDeleteUser = (username: string) => {
     const target = users.find((u) => u.username === username);
     if (!target) return;
 
+    // หาประวัติการจองทั้งหมดของผู้ใช้งานท่านนี้
+    const userBookings = bookings.filter(
+      (b) =>
+        (b.username && b.username.toLowerCase() === username.toLowerCase()) ||
+        (!b.username && b.requesterName && b.requesterName.trim().toLowerCase() === target.name.trim().toLowerCase())
+    );
+
+    const nowIso = new Date().toISOString();
+    const upcomingBookings = userBookings.filter(
+      (b) => b.endTime >= nowIso && b.status !== 'cancelled' && b.status !== 'rejected'
+    );
+
     setDeleteModalState({
       isOpen: true,
       title: 'ยืนยันการลบบัญชีผู้ใช้งาน',
-      description: 'คุณต้องการลบบัญชีผู้ใช้นี้ออกจากระบบถาวรใช่หรือไม่? ผู้ใช้งานจะไม่สามารถเข้าสู่ระบบได้อีกต่อไป',
+      description: 'คุณต้องการลบบัญชีผู้ใช้นี้ออกจากระบบใช่หรือไม่? ผู้ใช้งานจะไม่สามารถเข้าสู่ระบบได้อีกต่อไป',
       itemDetails: [
         { label: 'ชื่อ - นามสกุล', value: target.name },
         { label: 'ชื่อผู้ใช้งาน (Username)', value: target.username },
@@ -1314,12 +1332,54 @@ export default function App() {
               : target.role === 'manager'
                 ? 'ผู้ดูแลระบบ (Admin)'
                 : 'ผู้ใช้งานทั่วไป (User)'
+        },
+        {
+          label: 'ประวัติการจองห้องประชุม',
+          value:
+            userBookings.length > 0
+              ? `${userBookings.length} รายการ ${upcomingBookings.length > 0 ? `(ในอนาคต: ${upcomingBookings.length} รายการ)` : ''}`
+              : 'ไม่มีประวัติการจอง'
         }
       ],
+      notice: (
+        <div>
+          <div className="font-bold text-emerald-950">
+            ระบบคงประวัติการจองห้องประชุมไว้ในระบบ 100% (ข้อมูลไม่สูญหาย)
+          </div>
+          <div className="text-[11px] text-emerald-800 mt-0.5 leading-relaxed">
+            {userBookings.length > 0
+              ? `รายการจองทั้งหมด ${userBookings.length} รายการจะยังคงอยู่ครบถ้วนในปฏิทินและรายงานสถิติ โดยระบบจะระบุสถานะเป็น "อดีตผู้ใช้งาน / พ้นสภาพ" เพื่อให้ผู้ดูแลระบบตรวจสอบย้อนหลังได้`
+              : 'การลบบัญชีนี้จะไม่ส่งผลกระทบต่อรายการจองห้องประชุมหรือข้อมูลอื่นใดในระบบ'}
+          </div>
+        </div>
+      ),
       onConfirm: () => {
+        // 1. ลบบัญชีผู้ใช้จาก users state และ Firestore
         setUsers((prev) => prev.filter((u) => u.username !== username));
         deleteUserFromFirestore(target.id || target.username).catch(console.warn);
-        showToast(`ลบบัญชีผู้ใช้งาน "${target.name}" (${target.username}) เรียบร้อยแล้ว`, 'info');
+
+        // 2. คงประวัติการจองทั้งหมด และทำเครื่องหมาย requesterAccountStatus: 'deleted'
+        if (userBookings.length > 0) {
+          const userBookingIds = new Set(userBookings.map((b) => b.id));
+          setBookings((prev) =>
+            prev.map((b) => {
+              if (userBookingIds.has(b.id)) {
+                const updatedBooking: Booking = {
+                  ...b,
+                  requesterAccountStatus: 'deleted'
+                };
+                saveBookingToFirestore(updatedBooking).catch(console.warn);
+                return updatedBooking;
+              }
+              return b;
+            })
+          );
+        }
+
+        showToast(
+          `ลบบัญชีผู้ใช้งาน "${target.name}" เรียบร้อยแล้ว (คงประวัติการจอง ${userBookings.length} รายการไว้ในระบบ)`,
+          'info'
+        );
       }
     });
   };
@@ -1363,6 +1423,8 @@ export default function App() {
   };
 
   const handleUpdateUser = (updatedUser: UserAccount) => {
+    const existing = users.find((u) => u.username === updatedUser.username);
+
     setUsers((prev) =>
       prev.map((u) => (u.username === updatedUser.username ? updatedUser : u))
     );
@@ -1370,6 +1432,19 @@ export default function App() {
     if (currentUser?.username === updatedUser.username) {
       setCurrentUser(updatedUser);
     }
+
+    // If user's approval status changed:
+    if (existing && existing.status !== 'approved' && updatedUser.status === 'approved') {
+      const apprEmail = createUserApprovalEmail(updatedUser, currentUser?.name || 'ผู้ดูแลระบบ');
+      setEmailNotifications((prev) => [apprEmail, ...prev]);
+    } else if (existing && existing.status !== 'rejected' && updatedUser.status === 'rejected') {
+      const rejEmail = createUserRejectionEmail(
+        updatedUser,
+        updatedUser.rejectionReason || 'ข้อมูลไม่ผ่านเกณฑ์'
+      );
+      setEmailNotifications((prev) => [rejEmail, ...prev]);
+    }
+
     showToast(`อัปเดตข้อมูลผู้ใช้งาน "${updatedUser.name}" เรียบร้อยแล้ว`, 'success');
   };
 
@@ -1831,6 +1906,7 @@ export default function App() {
         rooms={rooms}
         isAdminMode={isAdminMode}
         currentUser={currentUser}
+        users={users}
         onApprove={handleApprove}
         onReject={handleRejectClick}
         onEditClick={(b) => {
@@ -1954,6 +2030,18 @@ export default function App() {
           showToast('ล้างกล่องข้อความอีเมลเรียบร้อย', 'info');
         }}
         onOpenBookingFromEmail={(bId) => {
+          if (bId.startsWith('USER-')) {
+            setIsEmailModalOpen(false);
+            if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager')) {
+              setManagementInitialTab('users');
+              setActivePage('management');
+              showToast('เปิดหน้าจัดการบัญชีผู้ใช้งาน', 'info');
+            } else {
+              setLoginModalReason('กรุณาเข้าสู่ระบบเพื่อจัดการผู้ใช้งานหรือเริ่มใช้งานระบบ');
+              setIsSsoModalOpen(true);
+            }
+            return;
+          }
           const found = bookings.find((b) => b.id === bId || String(b.id) === String(bId));
           if (found) {
             setIsEmailModalOpen(false);
@@ -2037,6 +2125,7 @@ export default function App() {
         title={deleteModalState.title}
         description={deleteModalState.description}
         itemDetails={deleteModalState.itemDetails}
+        notice={deleteModalState.notice}
         onConfirm={deleteModalState.onConfirm}
       />
     </div>

@@ -112,7 +112,13 @@ export const EmailNotificationModal: React.FC<EmailNotificationModalProps> = ({
                       <div className="flex items-center gap-1.5 min-w-0">
                         {icon}
                         <span className="font-bold text-gray-900 truncate">
-                          {m.isAdminNotice ? '🔔 Admin Notice' : '👤 ถึงผู้จอง'}
+                          {m.isAdminNotice
+                            ? m.bookingId?.startsWith('USER-')
+                              ? '🔔 Super Admin (ผู้สมัครใหม่)'
+                              : '🔔 Admin Notice'
+                            : m.bookingId?.startsWith('USER-')
+                            ? '👤 ถึงผู้สมัคร/ผู้ใช้งาน'
+                            : '👤 ถึงผู้จอง'}
                         </span>
                       </div>
                       <span className="text-[10px] text-gray-400 whitespace-nowrap">
@@ -165,7 +171,11 @@ export const EmailNotificationModal: React.FC<EmailNotificationModalProps> = ({
                         onClick={() => onOpenBookingFromEmail(selectedMail.bookingId)}
                         className="flex items-center gap-1 text-xs font-bold text-white bg-[#C8102E] hover:bg-[#a00c24] px-3 py-1.5 rounded-xl shadow-xs transition"
                       >
-                        <span>เปิดการจอง #{selectedMail.bookingId}</span>
+                        <span>
+                          {selectedMail.bookingId?.startsWith('USER-')
+                            ? 'ดูระบบจัดการผู้ใช้'
+                            : `เปิดการจอง #${selectedMail.bookingId}`}
+                        </span>
                         <ExternalLink size={12} />
                       </button>
                     </div>
