@@ -349,9 +349,9 @@ export function subscribeToAuditLogs(callback: (logs: AuditLog[]) => void) {
     }
   } catch (_) {}
 
-  // Real-time Firestore subscription
+  // Real-time Firestore subscription (limit to 100 to conserve Firestore read quota)
   try {
-    const q = query(collection(db, AUDIT_LOGS_COL), orderBy('timestamp', 'desc'), limit(300));
+    const q = query(collection(db, AUDIT_LOGS_COL), orderBy('timestamp', 'desc'), limit(100));
     const unsubscribe = onSnapshot(
       q,
       async (snapshot) => {

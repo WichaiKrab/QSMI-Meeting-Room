@@ -8,7 +8,8 @@ import {
   deleteDoc,
   onSnapshot,
   query,
-  orderBy
+  orderBy,
+  limit
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { Room, Booking, UserAccount, Department, EmailNotification, UserRole } from '../types';
@@ -28,10 +29,14 @@ const EMAILS_COL = 'emailNotifications';
 const MAIL_QUEUE_COL = 'mail';
 const USER_NOTIF_STATES_COL = 'userNotificationStates';
 
-// Initialize default data if firestore is empty
+// Initialize default data if firestore is empty (Optimized with limit(1) to save reads)
 export async function initializeFirestoreDefaults() {
   try {
-    const roomsSnap = await getDocs(collection(db, ROOMS_COL));
+    if (typeof window !== 'undefined' && sessionStorage.getItem('meeting_app_firestore_seeded')) {
+      return;
+    }
+
+    const roomsSnap = await getDocs(query(collection(db, ROOMS_COL), limit(1)));
     if (roomsSnap.empty) {
       console.log('Seeding initial rooms to Firestore...');
       for (const room of INITIAL_ROOMS) {
@@ -39,7 +44,7 @@ export async function initializeFirestoreDefaults() {
       }
     }
 
-    const deptsSnap = await getDocs(collection(db, DEPTS_COL));
+    const deptsSnap = await getDocs(query(collection(db, DEPTS_COL), limit(1)));
     if (deptsSnap.empty) {
       console.log('Seeding initial departments to Firestore...');
       for (const dept of INITIAL_DEPARTMENTS) {
@@ -47,7 +52,7 @@ export async function initializeFirestoreDefaults() {
       }
     }
 
-    const usersSnap = await getDocs(collection(db, USERS_COL));
+    const usersSnap = await getDocs(query(collection(db, USERS_COL), limit(1)));
     if (usersSnap.empty) {
       console.log('Seeding initial users to Firestore...');
       for (const user of CORPORATE_USERS) {
@@ -56,12 +61,16 @@ export async function initializeFirestoreDefaults() {
       }
     }
 
-    const bookingsSnap = await getDocs(collection(db, BOOKINGS_COL));
+    const bookingsSnap = await getDocs(query(collection(db, BOOKINGS_COL), limit(1)));
     if (bookingsSnap.empty) {
       console.log('Seeding initial bookings to Firestore...');
       for (const booking of INITIAL_BOOKINGS) {
         await setDoc(doc(db, BOOKINGS_COL, booking.id), booking);
       }
+    }
+
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('meeting_app_firestore_seeded', 'true');
     }
   } catch (err) {
     console.warn('Firestore initialization note:', err);
@@ -160,7 +169,7 @@ export function subscribeToDepartments(callback: (depts: Department[]) => void) 
 }
 
 export function subscribeToEmailNotifications(callback: (emails: EmailNotification[]) => void) {
-  const q = collection(db, EMAILS_COL);
+  const q = query(collection(db, EMAILS_COL), limit(50));
   return onSnapshot(q, (snapshot) => {
     const items: EmailNotification[] = [];
     snapshot.forEach((docSnap) => items.push(docSnap.data() as EmailNotification));

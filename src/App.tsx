@@ -632,6 +632,19 @@ export default function App() {
       }
     });
 
+    return () => {
+      unsubRooms();
+      unsubBookings();
+      unsubUsers();
+      unsubDepts();
+      unsubEmails();
+    };
+  }, []);
+
+  // Subscribe to Audit Logs ONLY for Super Admins to drastically reduce Firestore Read quotas
+  useEffect(() => {
+    if (currentUser?.role !== 'admin') return;
+
     const unsubAuditLogs = subscribeToAuditLogs((cloudLogs) => {
       if (cloudLogs && cloudLogs.length > 0) {
         setAuditLogs(cloudLogs);
@@ -642,14 +655,9 @@ export default function App() {
     });
 
     return () => {
-      unsubRooms();
-      unsubBookings();
-      unsubUsers();
-      unsubDepts();
-      unsubEmails();
       unsubAuditLogs();
     };
-  }, []);
+  }, [currentUser?.role]);
 
   // Sync to localStorage (Fallback and instant cache)
   useEffect(() => {
