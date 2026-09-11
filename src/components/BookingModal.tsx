@@ -15,7 +15,12 @@ import {
   Check,
   Plus,
   Info,
-  Loader2
+  Loader2,
+  CheckCircle2,
+  CalendarPlus,
+  Download,
+  Clock,
+  ArrowRight
 } from 'lucide-react';
 import { Room, Booking, UserAccount } from '../types';
 import {
@@ -28,11 +33,12 @@ import {
 } from '../utils/thaiDate';
 import { DEFAULT_BOOKING_EQUIPMENT, normalizeEquipmentName, normalizeSeatingName } from '../data/initialData';
 import { formatThaiPhone, normalizeThaiPhoneNumber } from '../utils/phoneUtils';
+import { generateGoogleCalendarUrl, downloadIcsFile } from '../utils/calendarSync';
 
 interface BookingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (formData: any) => void;
+  onSubmit: (formData: any) => Promise<Booking | boolean | void> | void;
   room?: Room;
   initialDate: Date;
   initialTime?: string | null;
@@ -40,6 +46,7 @@ interface BookingModalProps {
   currentUser: UserAccount | null;
   bookings?: Booking[];
   isSubmitting?: boolean;
+  onViewBookingDetail?: (booking: Booking) => void;
 }
 
 export const BookingModal: React.FC<BookingModalProps> = ({
@@ -52,10 +59,12 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   bookingData,
   currentUser,
   bookings = [],
-  isSubmitting = false
+  isSubmitting = false,
+  onViewBookingDetail
 }) => {
   if (!isOpen) return null;
 
+  const [successBooking, setSuccessBooking] = useState<Booking | null>(null);
   const [topic, setTopic] = useState('');
   const [name, setName] = useState('');
   const [department, setDepartment] = useState('');
@@ -259,6 +268,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
         setEmail('');
       }
     }
+    setSuccessBooking(null);
   }, [bookingData, initialDate, initialTime, currentUser, isOpen, room]);
 
   const handleEquipmentChange = (item: string) => {
@@ -267,7 +277,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setWarningMessage(null);
 
@@ -338,7 +348,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       return;
     }
 
-    onSubmit({
+    const res = await onSubmit({
       topic: topic.trim(),
       requesterName: name.trim(),
       department: department.trim() || 'ฝ่ายบริหารงานทั่วไป',
@@ -359,7 +369,204 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       meetingLink: '',
       note: note.trim()
     });
+
+    if (res && typeof res === 'object' && 'id' in res) {
+      setSuccessBooking(res as Booking);
+    }
   };
+
+  // Option 2: Render in-modal Success Screen smoothly in the same container
+  if (successBooking) {
+    const sRoom = room;
+    const googleCalUrl = generateGoogleCalendarUrl(successBooking, sRoom);
+
+    return (
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4 overflow-y-auto custom-scrollbar animate-fade-in"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setSuccessBooking(null);
+            onClose();
+          }
+        }}
+      >
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl p-5 sm:p-7 border-t-4 border-emerald-500 my-auto max-h-[92dvh] overflow-y-auto custom-scrollbar flex flex-col gap-4">
+          {/* Header */}
+          <div className="text-center pt-1">
+            <div className="w-14 h-14 mx-auto rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3 shadow-xs">
+              <CheckCircle2 size={32} />
+            </div>
+            <h2 className="text-xl sm:text-2xl font-black text-gray-900">
+              ส่งคำขอจองห้องประชุมสำเร็จ!
+            </h2>
+            <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
+              <span className="text-xs text-gray-500 font-medium">รหัสคำขอ:</span>
+              <span className="font-mono font-bold text-gray-900 bg-gray-100 px-2.5 py-0.5 rounded-lg border border-gray-200 text-xs sm:text-sm">
+                {successBooking.id}
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                <Clock size={13} />
+                รอการอนุมัติ (Pending)
+              </span>
+            </div>
+          </div>
+
+          {/* Booking Summary Box */}
+          <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200 space-y-2.5 text-xs sm:text-sm text-gray-700">
+            <div className="flex items-start gap-2.5 pb-2.5 border-b border-gray-200">
+              <MapPin size={18} className="text-[#C8102E] shrink-0 mt-0.5" />
+              <div>
+                <span className="text-[11px] font-bold text-gray-400 block uppercase">ห้องประชุม</span>
+                <span className="font-bold text-gray-900 text-sm sm:text-base block">
+                  {sRoom?.name || 'ห้องประชุม'}
+                </span>
+                {sRoom?.location && (
+                  <span className="text-xs text-gray-500 block">{sRoom.location}</span>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-0.5">
+              <div className="flex items-start gap-2">
+                <CalendarIcon size={16} className="text-gray-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="text-[11px] text-gray-400 block">วันที่</span>
+                  <span className="font-semibold text-gray-800">
+                    {formatFullThaiDate(new Date(successBooking.startTime))}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2">
+                <Clock size={16} className="text-gray-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="text-[11px] text-gray-400 block">ช่วงเวลา</span>
+                  <span className="font-semibold text-gray-800">
+                    {formatThaiTime(successBooking.startTime)} - {formatThaiTime(successBooking.endTime)} น.
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2 pt-1 border-t border-gray-200/80">
+              <FileText size={16} className="text-gray-400 shrink-0 mt-0.5" />
+              <div>
+                <span className="text-[11px] text-gray-400 block">หัวข้อการประชุม</span>
+                <span className="font-bold text-gray-900">{successBooking.topic}</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 border-t border-gray-200/80">
+              <div className="flex items-start gap-2">
+                <User size={16} className="text-gray-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="text-[11px] text-gray-400 block">ผู้จอง</span>
+                  <span className="font-medium text-gray-800">
+                    {successBooking.requesterName}
+                  </span>
+                  <span className="text-[11px] text-gray-500 block">
+                    {successBooking.department || '-'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2">
+                <Building size={16} className="text-gray-400 shrink-0 mt-0.5" />
+                <div>
+                  <span className="text-[11px] text-gray-400 block">จำนวนผู้เข้าร่วม</span>
+                  <span className="font-medium text-gray-800">
+                    {successBooking.participants} ท่าน
+                  </span>
+                  {successBooking.seatingSetup && (
+                    <span className="text-[11px] text-gray-500 block">
+                      จัดโต๊ะ: {normalizeSeatingName(successBooking.seatingSetup)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {(Number(successBooking.snacks || 0) > 0 ||
+              Number(successBooking.lunch || 0) > 0 ||
+              Number(successBooking.drinks || 0) > 0) && (
+              <div className="pt-2 border-t border-gray-200/80 text-xs text-gray-600 flex flex-wrap gap-x-3 gap-y-1">
+                <span className="font-bold text-gray-700">อาหารและเครื่องดื่ม:</span>
+                {Number(successBooking.snacks || 0) > 0 && <span>อาหารว่าง {successBooking.snacks} ชุด</span>}
+                {Number(successBooking.lunch || 0) > 0 && <span>อาหารกลางวัน {successBooking.lunch} ชุด</span>}
+                {Number(successBooking.drinks || 0) > 0 && <span>เครื่องดื่ม {successBooking.drinks} ที่</span>}
+              </div>
+            )}
+          </div>
+
+          {/* Notification Info Banner */}
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl text-xs text-blue-900 flex items-start gap-2.5">
+            <Mail size={17} className="text-blue-600 shrink-0 mt-0.5" />
+            <div className="leading-relaxed">
+              <span className="font-bold block">ระบบได้ส่งอีเมลแจ้งเตือนเรียบร้อยแล้ว</span>
+              <span className="text-blue-800">
+                ส่งคำขอไปยังผู้ดูแลระบบเพื่อพิจารณาอนุมัติ และส่งสำเนาแจ้งเตือนไปยัง {successBooking.email || 'อีเมลของคุณ'} แล้ว
+              </span>
+            </div>
+          </div>
+
+          {/* Calendar Sync Section */}
+          <div className="pt-1">
+            <span className="text-xs font-bold text-gray-500 uppercase block mb-2">
+              ซิงค์กับปฏิทินส่วนตัว (Calendar Sync)
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <a
+                href={googleCalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 py-2.5 px-3 bg-white hover:bg-blue-50 text-blue-700 font-bold rounded-xl border border-blue-200 shadow-2xs transition text-xs"
+              >
+                <CalendarPlus size={15} className="text-blue-600" />
+                <span>เพิ่มลง Google Calendar</span>
+              </a>
+              <button
+                type="button"
+                onClick={() => downloadIcsFile(successBooking, sRoom)}
+                className="flex items-center justify-center gap-2 py-2.5 px-3 bg-white hover:bg-gray-50 text-gray-700 font-bold rounded-xl border border-gray-200 shadow-2xs transition text-xs"
+              >
+                <Download size={15} className="text-gray-500" />
+                <span>บันทึกไฟล์ .ICS (มือถือ / Outlook)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Footer Actions */}
+          <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2.5">
+            {onViewBookingDetail && (
+              <button
+                type="button"
+                onClick={() => {
+                  const b = successBooking;
+                  setSuccessBooking(null);
+                  onViewBookingDetail(b);
+                }}
+                className="py-2.5 px-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition text-xs flex items-center gap-1.5"
+              >
+                <span>ดูรายละเอียดเต็ม</span>
+                <ArrowRight size={14} />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setSuccessBooking(null);
+                onClose();
+              }}
+              className="flex-1 py-2.5 px-4 bg-[#C8102E] hover:bg-[#a00c24] active:scale-98 text-white font-bold rounded-xl shadow-md transition text-xs sm:text-sm flex items-center justify-center gap-2"
+            >
+              <Check size={16} />
+              <span>ตกลง / ปิดหน้านี้</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

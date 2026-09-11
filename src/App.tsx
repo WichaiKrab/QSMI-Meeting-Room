@@ -1155,6 +1155,7 @@ export default function App() {
         showToast('บันทึกการแก้ไขข้อมูลเรียบร้อยแล้ว', 'success');
         setIsBookingModalOpen(false);
         setEditingBooking(null);
+        return true;
       } else {
         // Create new booking with Server Concurrency Check & Collision-free ID
         const newBookingData: Omit<Booking, 'id'> = {
@@ -1223,12 +1224,8 @@ export default function App() {
         });
 
         showToast(`ส่งคำขอจองเรียบร้อย รหัส ${newBooking.id} (รอการอนุมัติและส่งอีเมลแจ้งเตือนแล้ว)`, 'success');
-        setIsBookingModalOpen(false);
         setEditingBooking(null);
-
-        // Open detail modal to show summary & Google Calendar option
-        setViewingBooking(newBooking);
-        setIsDetailModalOpen(true);
+        return newBooking;
       }
     } catch (err: any) {
       console.error('Error submitting booking:', err);
@@ -2309,6 +2306,11 @@ export default function App() {
         currentUser={currentUser}
         bookings={bookings}
         isSubmitting={isSubmittingBooking}
+        onViewBookingDetail={(b) => {
+          setIsBookingModalOpen(false);
+          setViewingBooking(b);
+          setIsDetailModalOpen(true);
+        }}
       />
 
       {/* 2. Booking Detail Modal with Google Calendar Sync & Actions */}
