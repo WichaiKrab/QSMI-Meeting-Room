@@ -38,31 +38,11 @@ export function cleanupStorageCredentials(): void {
   if (typeof window === 'undefined') return;
 
   try {
-    // 1. Clean 'meeting_app_users' in localStorage
-    const rawUsers = localStorage.getItem('meeting_app_users');
-    if (rawUsers) {
-      try {
-        const parsed = JSON.parse(rawUsers);
-        if (Array.isArray(parsed)) {
-          let hasPassword = false;
-          const sanitized = parsed.map((item: any) => {
-            if (item && typeof item === 'object' && 'password' in item) {
-              hasPassword = true;
-              const { password, ...safe } = item;
-              return safe;
-            }
-            return item;
-          });
-
-          if (hasPassword) {
-            localStorage.setItem('meeting_app_users', JSON.stringify(sanitized));
-            console.log('🔒 [Security] Auto-purged plaintext passwords from meeting_app_users in localStorage');
-          }
-        }
-      } catch {
-        localStorage.removeItem('meeting_app_users');
-      }
-    }
+    // 1. Completely purge sensitive large plain-text dumps from localStorage
+    try {
+      localStorage.removeItem('meeting_app_users');
+      localStorage.removeItem('meeting_app_audit_logs');
+    } catch (_) {}
 
     // 2. Clean 'meeting_app_sso_user' in both localStorage and sessionStorage
     const storages: { name: string; storage: Storage }[] = [
@@ -109,3 +89,36 @@ export function cleanupStorageCredentials(): void {
     console.warn('Security storage cleanup notice:', err);
   }
 }
+
+/**
+ * Completely purge session and cached plain-text data upon user logout
+ * to ensure that shared computers or DevTools do not expose private corporate data.
+ */
+export function clearAllSensitiveStorageOnLogout(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.removeItem('meeting_app_sso_user');
+    sessionStorage.clear();
+
+    const keysToPurge = [
+      'meeting_app_sso_user',
+      'meeting_app_admin_auth',
+      'meeting_app_last_activity',
+      'meeting_app_audit_logs',
+      'meeting_app_users',
+      'meeting_app_bookings',
+      'meeting_app_emails',
+      'meeting_app_departments',
+      'meeting_app_notif_sync'
+    ];
+
+    for (const key of keysToPurge) {
+      try {
+        localStorage.removeItem(key);
+      } catch (_) {}
+    }
+  } catch (err) {
+    console.warn('Error clearing sensitive storage on logout:', err);
+  }
+}
+

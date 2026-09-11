@@ -76,7 +76,8 @@ import {
 import {
   sanitizeUserForStorage,
   sanitizeUsersForStorage,
-  cleanupStorageCredentials
+  cleanupStorageCredentials,
+  clearAllSensitiveStorageOnLogout
 } from './utils/securityUtils';
 
 export default function App() {
@@ -164,29 +165,9 @@ export default function App() {
     }
   });
 
+  // Users state maintained in memory and synced from Firestore (not persisted in plain text to localStorage)
   const [users, setUsers] = useState<UserAccount[]>(() => {
-    try {
-      const saved = localStorage.getItem('meeting_app_users');
-      let rawUsers: UserAccount[] = saved ? JSON.parse(saved) : CORPORATE_USERS;
-      if (Array.isArray(rawUsers) && rawUsers.length > 0) {
-        const legacyMockUsers = new Set(['admin1', 'mgr1', 'mgr2', 'mgr3', 'user1', 'user2', 'user3', 'user4', 'user5', 'user6', 'user7', 'napa.reg', 'panu.reg']);
-        rawUsers = rawUsers
-          .filter((u: UserAccount) => Boolean(u && u.username && !legacyMockUsers.has(u.username)))
-          .map((u: UserAccount) => ({
-            ...u,
-            name: u.name || u.username || 'ผู้ใช้งาน',
-            username: u.username || 'user',
-            department: u.department || 'ทั่วไป',
-            role: u.role || 'employee',
-            status: u.status || 'approved',
-          }));
-        if (rawUsers.length === 0) return CORPORATE_USERS;
-        return rawUsers;
-      }
-      return CORPORATE_USERS;
-    } catch {
-      return CORPORATE_USERS;
-    }
+    return CORPORATE_USERS;
   });
 
   const [departments, setDepartments] = useState<Department[]>(() => {
@@ -255,15 +236,8 @@ export default function App() {
     'approvals' | 'users' | 'bookings' | 'my_history' | 'rooms' | 'reports' | 'directory' | 'departments' | 'my_profile' | 'audit_logs'
   >('approvals');
 
-  // Audit Logs for Super Admin
+  // Audit Logs for Super Admin (held in memory & Firestore, never dumped into plain-text localStorage)
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => {
-    try {
-      const cached = localStorage.getItem('meeting_app_audit_logs');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (_) {}
     return getInitialHistoricalLogs();
   });
   const [isSsoModalOpen, setIsSsoModalOpen] = useState<boolean>(() => {
@@ -377,10 +351,7 @@ export default function App() {
     setIsAuthenticated(false);
     setIsAdminMode(false);
     try {
-      sessionStorage.removeItem('meeting_app_sso_user');
-      localStorage.removeItem('meeting_app_sso_user');
-      localStorage.removeItem('meeting_app_admin_auth');
-      localStorage.removeItem('meeting_app_last_activity');
+      clearAllSensitiveStorageOnLogout();
       localStorage.setItem(
         'meeting_app_auth_signal',
         JSON.stringify({
@@ -601,9 +572,6 @@ export default function App() {
     const unsubUsers = subscribeToUsers((cloudUsers) => {
       if (cloudUsers && cloudUsers.length > 0) {
         setUsers(cloudUsers);
-        try {
-          localStorage.setItem('meeting_app_users', JSON.stringify(sanitizeUsersForStorage(cloudUsers)));
-        } catch (_) {}
 
         setCurrentUser((prev) => {
           if (!prev) return null;
@@ -655,9 +623,6 @@ export default function App() {
     const unsubAuditLogs = subscribeToAuditLogs((cloudLogs) => {
       if (cloudLogs && cloudLogs.length > 0) {
         setAuditLogs(cloudLogs);
-        try {
-          localStorage.setItem('meeting_app_audit_logs', JSON.stringify(cloudLogs));
-        } catch (_) {}
       }
     });
 
@@ -684,12 +649,6 @@ export default function App() {
       localStorage.setItem('meeting_app_emails', JSON.stringify(emailNotifications));
     } catch (_) {}
   }, [emailNotifications]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('meeting_app_users', JSON.stringify(sanitizeUsersForStorage(users)));
-    } catch (_) {}
-  }, [users]);
 
   useEffect(() => {
     try {

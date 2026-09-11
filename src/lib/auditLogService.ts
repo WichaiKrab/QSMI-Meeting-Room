@@ -15,6 +15,16 @@ import { AuditLog, AuditActionType } from '../types';
 const AUDIT_LOGS_COL = 'auditLogs';
 const LOCAL_STORAGE_KEY = 'meeting_app_audit_logs';
 
+// In-memory cache for audit logs (avoids persisting sensitive admin logs in DevTools / LocalStorage)
+let inMemoryAuditLogs: AuditLog[] = [];
+
+// Cleanup any legacy audit logs stored in localStorage
+if (typeof window !== 'undefined') {
+  try {
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
+  } catch (_) {}
+}
+
 /**
  * Parse raw User-Agent string into human-friendly device & browser description
  */
@@ -313,22 +323,15 @@ export async function logActivity(params: {
     details: params.details || {}
   };
 
-  // 1. Save to local storage cache immediately
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    const existing: AuditLog[] = raw ? JSON.parse(raw) : [];
-    const updated = [auditEntry, ...existing.filter((item) => item.id !== id)].slice(0, 500);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
-  } catch (err) {
-    console.warn('Local storage audit log warning:', err);
-  }
+  // 1. Save to in-memory cache immediately
+  inMemoryAuditLogs = [auditEntry, ...inMemoryAuditLogs.filter((item) => item.id !== id)].slice(0, 500);
 
   // 2. Persist to Firestore
   try {
     const docRef = doc(db, AUDIT_LOGS_COL, id);
     await setDoc(docRef, auditEntry);
   } catch (err) {
-    console.warn('Firestore logActivity error (saved to local backup):', err);
+    console.warn('Firestore logActivity error (saved to memory backup):', err);
   }
 
   return auditEntry;
@@ -338,16 +341,10 @@ export async function logActivity(params: {
  * Subscribe to Audit Logs in Real-Time
  */
 export function subscribeToAuditLogs(callback: (logs: AuditLog[]) => void) {
-  // Read local cache first for instant render
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (raw) {
-      const parsed: AuditLog[] = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        callback(parsed);
-      }
-    }
-  } catch (_) {}
+  // Read in-memory cache first if available for instant render
+  if (inMemoryAuditLogs.length > 0) {
+    callback(inMemoryAuditLogs);
+  }
 
   // Real-time Firestore subscription (limit to 50 to conserve Firestore read quota)
   try {
@@ -363,34 +360,25 @@ export function subscribeToAuditLogs(callback: (logs: AuditLog[]) => void) {
               await setDoc(doc(db, AUDIT_LOGS_COL, s.id), s);
             } catch (_) {}
           }
+          inMemoryAuditLogs = seeds;
           callback(seeds);
-          try {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(seeds));
-          } catch (_) {}
         } else {
           const logs: AuditLog[] = [];
           snapshot.forEach((docSnap) => {
             logs.push(docSnap.data() as AuditLog);
           });
+          inMemoryAuditLogs = logs;
           callback(logs);
-          try {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(logs));
-          } catch (_) {}
         }
       },
       (err) => {
-        console.warn('Audit logs subscription fallback to local cache:', err);
-        // Fallback to local cache or default seeds
-        try {
-          const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-          if (raw) {
-            callback(JSON.parse(raw));
-          } else {
-            const seeds = getInitialHistoricalLogs();
-            callback(seeds);
-          }
-        } catch (_) {
-          callback(getInitialHistoricalLogs());
+        console.warn('Audit logs subscription fallback to in-memory cache:', err);
+        if (inMemoryAuditLogs.length > 0) {
+          callback(inMemoryAuditLogs);
+        } else {
+          const seeds = getInitialHistoricalLogs();
+          inMemoryAuditLogs = seeds;
+          callback(seeds);
         }
       }
     );
@@ -413,23 +401,24 @@ export async function fetchLatestAuditLogs(limitCount = 50): Promise<AuditLog[]>
     const logs: AuditLog[] = [];
     snap.forEach((d) => logs.push(d.data() as AuditLog));
     if (logs.length > 0) {
-      try {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(logs));
-      } catch (_) {}
+      inMemoryAuditLogs = logs;
     }
     return logs;
   } catch (err) {
     console.warn('Failed to fetch latest audit logs:', err);
-    return [];
+    return inMemoryAuditLogs;
   }
 }
 
 /**
- * Clear or reset all audit logs in Firestore & localStorage (Super Admin only)
+ * Clear or reset all audit logs in Firestore & memory (Super Admin only)
  */
 export async function clearAllAuditLogs(): Promise<void> {
   try {
-    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    inMemoryAuditLogs = [];
+    try {
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
+    } catch (_) {}
     const snap = await getDocs(collection(db, AUDIT_LOGS_COL));
     const deletePromises = snap.docs.map((d) => deleteDoc(d.ref));
     await Promise.all(deletePromises);
