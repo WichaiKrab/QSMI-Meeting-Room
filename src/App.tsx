@@ -101,6 +101,9 @@ export default function App() {
     }
   });
 
+  // Active (non-retired) rooms for booking view & calendar slots
+  const activeRooms = useMemo(() => rooms.filter((r) => !r.isRetired), [rooms]);
+
   const [bookings, setBookings] = useState<Booking[]>(() => {
     try {
       const saved = localStorage.getItem('meeting_app_bookings');
@@ -1065,7 +1068,7 @@ export default function App() {
       setCurrentDate(targetDate);
     }
 
-    const defaultRoom = rooms[0];
+    const defaultRoom = activeRooms.find((r) => r.isActive) || activeRooms[0] || rooms[0];
     let defaultTime = '09:00';
 
     const isToday =
@@ -1102,6 +1105,11 @@ export default function App() {
     const room = selectedSlotRoom || rooms.find((r) => r.id === editingBooking?.roomId);
     if (!room) {
       showToast('กรุณาเลือกห้องประชุม', 'error');
+      return;
+    }
+
+    if (room.isRetired && !editingBooking) {
+      showToast('ไม่สามารถจองห้องประชุมที่เลิกใช้งานแล้วได้', 'error');
       return;
     }
 
@@ -1494,6 +1502,7 @@ export default function App() {
     seatingOptions?: string[];
     color?: string;
     isActive?: boolean;
+    isRetired?: boolean;
     hasSpecialSeating?: boolean;
   }) => {
     const newRoom: Room = {
@@ -1501,6 +1510,7 @@ export default function App() {
       name: newRoomData.name,
       color: newRoomData.color || 'bg-blue-100 border-blue-300 text-blue-800',
       isActive: newRoomData.isActive ?? true,
+      isRetired: newRoomData.isRetired ?? false,
       capacity: newRoomData.capacity || 20,
       location: newRoomData.location || 'ตึกอำนวยการ',
       description: newRoomData.description,
@@ -1543,8 +1553,8 @@ export default function App() {
       title: 'ยืนยันการลบห้องประชุม',
       description:
         activeBookings.length > 0
-          ? `ห้องประชุมนี้มีรายการจองค้างอยู่ ${activeBookings.length} รายการ การลบห้องอาจส่งผลต่อการแสดงผลของรายการจองเดิม คุณแน่ใจหรือไม่ที่จะลบห้องนี้?`
-          : 'คุณต้องการลบข้อมูลห้องประชุมนี้ออกจากระบบถาวรใช่หรือไม่?',
+          ? `ห้องประชุมนี้มีรายการจองค้างอยู่ ${activeBookings.length} รายการ การลบห้องอาจส่งผลต่อการแสดงผลของรายการจองเดิม แนะนำให้ใช้ปุ่ม "ซ่อนห้อง (เลิกใช้งาน)" แทนการลบเพื่อไม่ให้กระทบต่อประวัติการจองและรายงานย้อนหลัง คุณแน่ใจหรือไม่ที่จะลบห้องนี้ถาวร?`
+          : 'คุณต้องการลบข้อมูลห้องประชุมนี้ออกจากระบบถาวรใช่หรือไม่? (หากห้องเลิกใช้งาน แนะนำให้ใช้ปุ่ม "ซ่อนห้อง" เพื่อเก็บประวัติการจอง)',
       itemDetails: [
         { label: 'ชื่อห้องประชุม', value: room.name },
         { label: 'สถานที่ / อาคาร', value: room.location || 'ตึกอำนวยการ' },
@@ -1578,6 +1588,28 @@ export default function App() {
       .catch((err) => {
         console.error('Error toggling room status in Firestore:', err);
         showToast(`ปรับปรุงสถานะในเครื่องแล้ว (คลาวด์: ${err?.message || 'ข้อผิดพลาด'})`, 'error');
+      });
+  };
+
+  const handleToggleRoomRetired = (roomId: string) => {
+    const targetRoom = rooms.find((r) => r.id === roomId);
+    if (!targetRoom) return;
+    const nextRetired = !targetRoom.isRetired;
+    setRooms((prev) =>
+      prev.map((r) => (r.id === roomId ? { ...r, isRetired: nextRetired } : r))
+    );
+    updateRoomInFirestore(roomId, { isRetired: nextRetired })
+      .then(() => {
+        showToast(
+          nextRetired
+            ? `ซ่อนห้อง "${targetRoom.name}" เรียบร้อยแล้ว (ไม่แสดงในหน้าจองใหม่ แต่ข้อมูลประวัติเดิมยังคงอยู่ครบถ้วน)`
+            : `ยกเลิกการซ่อนห้อง "${targetRoom.name}" เรียบร้อยแล้ว (พร้อมให้จองตามปกติ)`,
+          'info'
+        );
+      })
+      .catch((err) => {
+        console.error('Error toggling room retired status:', err);
+        showToast(`ปรับสถานะในเครื่องแล้ว (คลาวด์: ${err?.message || 'ข้อผิดพลาด'})`, 'error');
       });
   };
 
@@ -2174,6 +2206,7 @@ export default function App() {
             }}
             onDeleteRoom={handleDeleteRoom}
             onToggleRoomStatus={handleToggleRoomStatus}
+            onToggleRoomRetired={handleToggleRoomRetired}
             onApproveUser={handleApproveUser}
             onRejectUser={handleRejectUser}
             onDeleteUser={handleDeleteUser}
@@ -2214,7 +2247,7 @@ export default function App() {
           {viewMode === 'day' && (
             <DayView
               currentDate={currentDate}
-              rooms={rooms}
+              rooms={activeRooms}
               bookings={bookings}
               isAdminMode={isAdminMode}
               onSlotClick={handleOpenSlot}
@@ -2234,7 +2267,7 @@ export default function App() {
           {viewMode === 'week' && (
             <WeekView
               currentDate={currentDate}
-              rooms={rooms}
+              rooms={activeRooms}
               bookings={bookings}
               isAdminMode={isAdminMode}
               onSlotClick={handleOpenSlot}
@@ -2258,7 +2291,7 @@ export default function App() {
           {viewMode === 'month' && (
             <MonthView
               currentDate={currentDate}
-              rooms={rooms}
+              rooms={activeRooms}
               bookings={bookings}
               isAdminMode={isAdminMode}
               onSlotClick={handleOpenSlot}
@@ -2519,13 +2552,14 @@ export default function App() {
         onUpdateRoom={handleUpdateRoom}
         onDeleteRoom={handleDeleteRoom}
         onToggleRoomStatus={handleToggleRoomStatus}
+        onToggleRoomRetired={handleToggleRoomRetired}
       />
 
       {/* 8. Block Room for Maintenance Modal */}
       <BlockRoomModal
         isOpen={isBlockModalOpen}
         onClose={() => setIsBlockModalOpen(false)}
-        rooms={rooms}
+        rooms={activeRooms}
         onBlock={handleBlockRoom}
       />
 

@@ -17,7 +17,10 @@ import {
   Mic,
   Video,
   FileText,
-  Search
+  Search,
+  Eye,
+  EyeOff,
+  Info
 } from 'lucide-react';
 import { Room, Booking } from '../types';
 import { PRESET_EQUIPMENT, PRESET_SEATING, normalizeEquipmentName, normalizeSeatingName } from '../data/initialData';
@@ -37,11 +40,13 @@ interface RoomManagementModalProps {
     seatingOptions?: string[];
     color?: string;
     isActive?: boolean;
+    isRetired?: boolean;
     hasSpecialSeating?: boolean;
   }) => void;
   onUpdateRoom: (room: Room) => void;
   onDeleteRoom: (roomId: string) => void;
   onToggleRoomStatus: (roomId: string) => void;
+  onToggleRoomRetired?: (roomId: string) => void;
 }
 
 const PRESET_COLORS = [
@@ -64,7 +69,8 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
   onAddRoom,
   onUpdateRoom,
   onDeleteRoom,
-  onToggleRoomStatus
+  onToggleRoomStatus,
+  onToggleRoomRetired
 }) => {
   if (!isOpen) return null;
 
@@ -84,6 +90,7 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
   const [customSeatingInput, setCustomSeatingInput] = useState('');
   const [colorClass, setColorClass] = useState(PRESET_COLORS[0].value);
   const [isActive, setIsActive] = useState(true);
+  const [isRetired, setIsRetired] = useState(false);
 
   // Equipment Options Catalog (Add, Delete, Edit)
   const [equipmentCatalog, setEquipmentCatalog] = useState<string[]>(() => {
@@ -160,6 +167,7 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
     setSelectedSeating(['Classroom (ห้องเรียน)', 'Meeting (U) (จัดโต๊ะรูปตัว U)']);
     setColorClass(PRESET_COLORS[0].value);
     setIsActive(true);
+    setIsRetired(false);
     setCustomEqInput('');
     setCustomSeatingInput('');
     setEditingEqItem(null);
@@ -198,6 +206,7 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
 
     setColorClass(room.color || PRESET_COLORS[0].value);
     setIsActive(room.isActive);
+    setIsRetired(room.isRetired ?? false);
     setCustomEqInput('');
     setCustomSeatingInput('');
     setEditingEqItem(null);
@@ -333,6 +342,7 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
         seatingOptions: selectedSeating,
         color: colorClass,
         isActive,
+        isRetired,
         hasSpecialSeating: hasMonkSeating
       });
       setFormMode('list');
@@ -347,6 +357,7 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
         seatingOptions: selectedSeating,
         color: colorClass,
         isActive,
+        isRetired,
         hasSpecialSeating: hasMonkSeating
       });
       setFormMode('list');
@@ -488,7 +499,11 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
                     <div
                       key={room.id}
                       className={`p-4 rounded-2xl border transition flex flex-col gap-3 ${
-                        room.isActive ? 'border-gray-200 bg-white hover:shadow-xs' : 'border-red-200 bg-red-50/40'
+                        room.isRetired
+                          ? 'border-amber-300 bg-amber-50/40 ring-1 ring-amber-200'
+                          : room.isActive
+                          ? 'border-gray-200 bg-white hover:shadow-xs'
+                          : 'border-red-200 bg-red-50/40'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -497,15 +512,22 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
                             <h3 className="font-bold text-sm sm:text-base text-gray-900 leading-snug">
                               {room.name}
                             </h3>
-                            <span
-                              className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
-                                room.isActive
-                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                  : 'bg-red-100 text-red-800 border border-red-200'
-                              }`}
-                            >
-                              {room.isActive ? 'เปิดใช้งานปกติ' : 'ปิดปรับปรุง'}
-                            </span>
+                            {room.isRetired ? (
+                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                                <EyeOff size={11} />
+                                <span>เลิกใช้งาน (ซ่อนอยู่)</span>
+                              </span>
+                            ) : (
+                              <span
+                                className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
+                                  room.isActive
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                    : 'bg-red-100 text-red-800 border border-red-200'
+                                }`}
+                              >
+                                {room.isActive ? 'เปิดใช้งานปกติ' : 'ปิดปรับปรุง'}
+                              </span>
+                            )}
                             {bookingCount > 0 && (
                               <span className="text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md border border-blue-200">
                                 การจอง {bookingCount} รายการ
@@ -535,6 +557,13 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
                             </p>
                           )}
 
+                          {room.isRetired && (
+                            <div className="mt-2 text-[11px] font-medium text-amber-900 bg-amber-100/70 p-2 rounded-xl border border-amber-200 flex items-start gap-1.5">
+                              <Info size={13} className="text-amber-700 shrink-0 mt-0.5" />
+                              <span>ห้องนี้ถูกซ่อนจากหน้าจองใหม่แล้ว แต่ประวัติการจองและรายงานย้อนหลังยังคงอยู่ครบถ้วน</span>
+                            </div>
+                          )}
+
                           {/* Facilities badges */}
                           {room.equipment && room.equipment.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-2">
@@ -551,23 +580,44 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
                         </div>
 
                         {/* Actions */}
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {/* Toggle status */}
-                          <button
-                            type="button"
-                            onClick={() => onToggleRoomStatus(room.id)}
-                            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition ${
-                              room.isActive
-                                ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
-                            }`}
-                            title="สลับสถานะเปิด/ปิดปรับปรุงห้อง"
-                          >
-                            {room.isActive ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
-                            <span className="hidden sm:inline">
-                              {room.isActive ? 'เปิดใช้งาน' : 'ปิดปรับปรุง'}
-                            </span>
-                          </button>
+                        <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                          {/* Toggle status for non-retired rooms */}
+                          {!room.isRetired && (
+                            <button
+                              type="button"
+                              onClick={() => onToggleRoomStatus(room.id)}
+                              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                                room.isActive
+                                  ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
+                              }`}
+                              title="สลับสถานะเปิด/ปิดปรับปรุงห้อง"
+                            >
+                              {room.isActive ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                              <span className="hidden sm:inline">
+                                {room.isActive ? 'เปิดใช้งาน' : 'ปิดปรับปรุง'}
+                              </span>
+                            </button>
+                          )}
+
+                          {/* Hide / Unhide button */}
+                          {onToggleRoomRetired && (
+                            <button
+                              type="button"
+                              onClick={() => onToggleRoomRetired(room.id)}
+                              className={`flex items-center gap-1 p-2 sm:px-2.5 sm:py-1.5 rounded-xl text-xs font-bold transition border ${
+                                room.isRetired
+                                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-xs'
+                                  : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200'
+                              }`}
+                              title={room.isRetired ? 'ยกเลิกการซ่อน นำห้องนี้กลับมาเปิดให้จอง' : 'ซ่อนห้องนี้สำหรับห้องที่เลิกใช้งานแล้ว'}
+                            >
+                              {room.isRetired ? <Eye size={14} /> : <EyeOff size={14} />}
+                              <span className="hidden sm:inline">
+                                {room.isRetired ? 'ยกเลิกซ่อน' : 'ซ่อนห้อง'}
+                              </span>
+                            </button>
+                          )}
 
                           {/* Edit button */}
                           <button
@@ -976,6 +1026,37 @@ export const RoomManagementModal: React.FC<RoomManagementModalProps> = ({
               >
                 <span>{isActive ? 'เปิดใช้งานปกติ (พร้อมจอง)' : 'ปิดปรับปรุง (ห้ามจอง)'}</span>
                 {isActive ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+              </button>
+            </div>
+
+            {/* Retired / Hide Room for Decommissioned Rooms */}
+            <div className="pt-1">
+              <label className="block text-xs font-bold text-gray-700 mb-1">
+                การซ่อนห้องประชุม (สำหรับห้องที่เลิกใช้งานแล้ว)
+              </label>
+              <button
+                type="button"
+                onClick={() => setIsRetired(!isRetired)}
+                className={`w-full p-2.5 rounded-xl border flex items-center justify-between text-xs font-bold transition ${
+                  isRetired
+                    ? 'bg-amber-50 border-amber-300 text-amber-800 ring-1 ring-amber-200'
+                    : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <div className="flex items-center gap-2 text-left">
+                  <EyeOff size={16} className={isRetired ? 'text-amber-600' : 'text-gray-400'} />
+                  <div>
+                    <span className="block font-bold">
+                      {isRetired ? 'ซ่อนห้องประชุมนี้ (เลิกใช้งานแล้ว)' : 'แสดงห้องประชุมตามปกติ'}
+                    </span>
+                    <span className="block text-[11px] font-normal text-gray-500 mt-0.5">
+                      {isRetired
+                        ? 'ห้องนี้จะไม่แสดงในหน้าจองใหม่ แต่ข้อมูลประวัติการจองและรายงานย้อนหลังยังคงอยู่ครบถ้วน'
+                        : 'แสดงในหน้าจองห้องใหม่ตามปกติ'}
+                    </span>
+                  </div>
+                </div>
+                {isRetired ? <ToggleRight size={20} className="text-amber-600 shrink-0" /> : <ToggleLeft size={20} className="text-gray-400 shrink-0" />}
               </button>
             </div>
 

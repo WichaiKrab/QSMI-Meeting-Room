@@ -26,6 +26,8 @@ import {
   Users,
   Settings,
   Eye,
+  EyeOff,
+  Info,
   Check,
   X,
   UserPlus,
@@ -77,6 +79,7 @@ interface ManagementPortalProps {
   onEditRoom?: (room: Room) => void;
   onDeleteRoom?: (roomId: string) => void;
   onToggleRoomStatus?: (roomId: string) => void;
+  onToggleRoomRetired?: (roomId: string) => void;
   onViewBooking: (booking: Booking) => void;
   onRequestCancel: (booking: Booking) => void;
   onBackToBooking: () => void;
@@ -119,6 +122,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
   onEditRoom,
   onDeleteRoom,
   onToggleRoomStatus,
+  onToggleRoomRetired,
   onViewBooking,
   onRequestCancel,
   onBackToBooking,
@@ -238,6 +242,30 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
   const [userRoleFilter, setUserRoleFilter] = useState<'all' | UserRole | 'pending'>('all');
   const [usersDisplayLimit, setUsersDisplayLimit] = useState<number>(10);
   const [pendingUsersDisplayLimit, setPendingUsersDisplayLimit] = useState<number>(10);
+
+  // Search & Filter in Rooms Tab
+  const [roomSearchTerm, setRoomSearchTerm] = useState('');
+  const [roomStatusFilter, setRoomStatusFilter] = useState<'all' | 'active' | 'maintenance' | 'retired'>('all');
+
+  const activeRoomsCount = useMemo(() => rooms.filter((r) => !r.isRetired && r.isActive).length, [rooms]);
+  const maintenanceRoomsCount = useMemo(() => rooms.filter((r) => !r.isRetired && !r.isActive).length, [rooms]);
+  const retiredRoomsCount = useMemo(() => rooms.filter((r) => r.isRetired).length, [rooms]);
+
+  const filteredRoomsInTab = useMemo(() => {
+    return rooms.filter((r) => {
+      if (roomStatusFilter === 'active' && (r.isRetired || !r.isActive)) return false;
+      if (roomStatusFilter === 'maintenance' && (r.isRetired || r.isActive)) return false;
+      if (roomStatusFilter === 'retired' && !r.isRetired) return false;
+      if (roomSearchTerm.trim()) {
+        const q = roomSearchTerm.toLowerCase();
+        const mName = r.name.toLowerCase().includes(q);
+        const mLoc = r.location?.toLowerCase().includes(q);
+        const mDesc = r.description?.toLowerCase().includes(q);
+        if (!mName && !mLoc && !mDesc) return false;
+      }
+      return true;
+    });
+  }, [rooms, roomStatusFilter, roomSearchTerm]);
 
   // Approvals Limit
   const [approvalsDisplayLimit, setApprovalsDisplayLimit] = useState<number>(10);
@@ -2570,120 +2598,249 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
               </div>
             </div>
 
-            {/* Rooms Cards with Rich Details */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-              {rooms.map((room) => (
-                <div
-                  key={room.id}
-                  className={`p-4 rounded-2xl border transition flex flex-col justify-between gap-3 ${
-                    room.isActive ? 'bg-white border-gray-200 hover:shadow-xs' : 'bg-red-50/40 border-red-200'
+            {/* Filter Pills and Search Bar */}
+            <div className="flex flex-col sm:flex-row gap-2.5 justify-between items-stretch sm:items-center bg-gray-50/80 p-2.5 rounded-2xl border border-gray-200">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                <button
+                  type="button"
+                  onClick={() => setRoomStatusFilter('all')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                    roomStatusFilter === 'all'
+                      ? 'bg-gray-900 text-white shadow-xs'
+                      : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
                   }`}
                 >
-                  <div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span
-                        className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
-                          room.isActive
-                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                            : 'bg-red-100 text-red-800 border border-red-200'
-                        }`}
-                      >
-                        {room.isActive ? 'เปิดใช้งานปกติ' : 'ปิดปรับปรุง'}
-                      </span>
-                      <span className="text-xs text-gray-500 font-bold">
-                        {room.capacity || 20} ที่นั่ง
-                      </span>
-                    </div>
+                  ทั้งหมด ({rooms.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRoomStatusFilter('active')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                    roomStatusFilter === 'active'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                  }`}
+                >
+                  เปิดใช้งานปกติ ({activeRoomsCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRoomStatusFilter('maintenance')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                    roomStatusFilter === 'maintenance'
+                      ? 'bg-red-600 text-white shadow-xs'
+                      : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                  }`}
+                >
+                  ปิดปรับปรุง ({maintenanceRoomsCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRoomStatusFilter('retired')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap flex items-center gap-1.5 ${
+                    roomStatusFilter === 'retired'
+                      ? 'bg-amber-600 text-white shadow-xs'
+                      : 'bg-white text-amber-800 hover:bg-amber-50 border border-amber-300'
+                  }`}
+                >
+                  <EyeOff size={13} />
+                  <span>เลิกใช้งาน / ซ่อนอยู่ ({retiredRoomsCount})</span>
+                </button>
+              </div>
 
-                    <h4 className="text-sm sm:text-base font-bold text-gray-900 mt-2">
-                      {room.name}
-                    </h4>
-                    {room.location && (
-                      <p className="text-xs text-gray-500 mt-0.5">{room.location}</p>
-                    )}
-
-                    {room.description && (
-                      <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-                        {room.description}
-                      </p>
-                    )}
-
-                    {/* Equipment badges */}
-                    {room.equipment && room.equipment.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2.5">
-                        {room.equipment.map((eq, i) => (
-                          <span
-                            key={i}
-                            className="text-[10px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-medium border border-gray-200"
-                          >
-                            {eq}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Seating Formats */}
-                    {room.seatingOptions && room.seatingOptions.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {room.seatingOptions.map((seat, i) => (
-                          <span
-                            key={i}
-                            className="text-[9px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-medium border border-blue-200"
-                          >
-                            {seat}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center justify-between pt-3 border-t border-gray-100 gap-2">
-                    {/* Toggle Status */}
-                    <button
-                      type="button"
-                      onClick={() => onToggleRoomStatus && onToggleRoomStatus(room.id)}
-                      className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition ${
-                        room.isActive
-                          ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
-                      }`}
-                    >
-                      {room.isActive ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
-                      <span>{room.isActive ? 'เปิด' : 'ปิด'}</span>
-                    </button>
-
-                    <div className="flex items-center gap-1.5">
-                      {/* Edit room */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (onEditRoom) {
-                            onEditRoom(room);
-                          } else {
-                            onOpenRoomModal();
-                          }
-                        }}
-                        className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold transition border border-blue-200"
-                      >
-                        <Edit size={13} />
-                        <span>แก้ไข</span>
-                      </button>
-
-                      {/* Delete room */}
-                      <button
-                        type="button"
-                        onClick={() => onDeleteRoom && onDeleteRoom(room.id)}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition border border-transparent hover:border-red-200"
-                        title="ลบห้องนี้"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+              <div className="relative min-w-[200px] sm:w-64">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="ค้นหาชื่อห้อง, สถานที่..."
+                  value={roomSearchTerm}
+                  onChange={(e) => setRoomSearchTerm(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 focus:border-[#C8102E]"
+                />
+              </div>
             </div>
+
+            {/* Rooms Cards with Rich Details */}
+            {filteredRoomsInTab.length === 0 ? (
+              <div className="text-center py-12 bg-gray-50 rounded-2xl border border-dashed border-gray-200 text-gray-500 font-semibold">
+                <p className="text-sm">ไม่พบห้องประชุมตามเงื่อนไขที่เลือก</p>
+                {roomSearchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRoomSearchTerm('');
+                      setRoomStatusFilter('all');
+                    }}
+                    className="mt-2 text-xs text-[#C8102E] font-bold hover:underline"
+                  >
+                    ล้างตัวกรองและคำค้นหา
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                {filteredRoomsInTab.map((room) => (
+                  <div
+                    key={room.id}
+                    className={`p-4 rounded-2xl border transition flex flex-col justify-between gap-3 ${
+                      room.isRetired
+                        ? 'bg-amber-50/30 border-amber-300 ring-1 ring-amber-200'
+                        : room.isActive
+                        ? 'bg-white border-gray-200 hover:shadow-xs'
+                        : 'bg-red-50/40 border-red-200'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        {room.isRetired ? (
+                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                            <EyeOff size={11} />
+                            <span>เลิกใช้งาน (ซ่อนอยู่)</span>
+                          </span>
+                        ) : (
+                          <span
+                            className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                              room.isActive
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                : 'bg-red-100 text-red-800 border border-red-200'
+                            }`}
+                          >
+                            {room.isActive ? 'เปิดใช้งานปกติ' : 'ปิดปรับปรุง'}
+                          </span>
+                        )}
+                        <span className="text-xs text-gray-500 font-bold">
+                          {room.capacity || 20} ที่นั่ง
+                        </span>
+                      </div>
+
+                      <h4 className="text-sm sm:text-base font-bold text-gray-900 mt-2 flex items-center gap-1.5">
+                        <span>{room.name}</span>
+                        {room.isRetired && (
+                          <span className="text-[10px] font-medium text-amber-700">(ซ่อน)</span>
+                        )}
+                      </h4>
+                      {room.location && (
+                        <p className="text-xs text-gray-500 mt-0.5">{room.location}</p>
+                      )}
+
+                      {room.description && (
+                        <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                          {room.description}
+                        </p>
+                      )}
+
+                      {/* Retired info banner */}
+                      {room.isRetired && (
+                        <div className="mt-2 text-[11px] font-medium text-amber-900 bg-amber-100/70 p-2 rounded-xl border border-amber-200 flex items-start gap-1.5">
+                          <Info size={14} className="text-amber-700 shrink-0 mt-0.5" />
+                          <span>ห้องนี้ถูกซ่อนจากหน้าจองใหม่แล้ว ไม่แสดงในปฏิทิน แต่ประวัติการจองและรายงานย้อนหลังยังคงอยู่ครบถ้วน</span>
+                        </div>
+                      )}
+
+                      {/* Equipment badges */}
+                      {room.equipment && room.equipment.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2.5">
+                          {room.equipment.map((eq, i) => (
+                            <span
+                              key={i}
+                              className="text-[10px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-medium border border-gray-200"
+                            >
+                              {eq}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Seating Formats */}
+                      {room.seatingOptions && room.seatingOptions.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {room.seatingOptions.map((seat, i) => (
+                            <span
+                              key={i}
+                              className="text-[9px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-medium border border-blue-200"
+                            >
+                              {seat}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center justify-between pt-3 border-t border-gray-100 gap-2 flex-wrap">
+                      {room.isRetired ? (
+                        /* When room is retired: Show unhide button */
+                        <button
+                          type="button"
+                          onClick={() => onToggleRoomRetired && onToggleRoomRetired(room.id)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs"
+                          title="ยกเลิกการซ่อน นำห้องประชุมนี้กลับมาเปิดให้จองใหม่ตามปกติ"
+                        >
+                          <Eye size={14} />
+                          <span>ยกเลิกซ่อน (นำกลับมาใช้งาน)</span>
+                        </button>
+                      ) : (
+                        /* When room is not retired: Toggle status */
+                        <button
+                          type="button"
+                          onClick={() => onToggleRoomStatus && onToggleRoomStatus(room.id)}
+                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                            room.isActive
+                              ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
+                          }`}
+                        >
+                          {room.isActive ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                          <span>{room.isActive ? 'เปิด' : 'ปิด'}</span>
+                        </button>
+                      )}
+
+                      <div className="flex items-center gap-1.5">
+                        {/* Hide button for non-retired rooms */}
+                        {!room.isRetired && onToggleRoomRetired && (
+                          <button
+                            type="button"
+                            onClick={() => onToggleRoomRetired(room.id)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl text-xs font-bold transition border border-amber-200"
+                            title="ซ่อนห้องประชุมนี้ (สำหรับห้องที่เลิกใช้งานแล้ว ไม่ให้แสดงในหน้าจองใหม่ แต่เก็บประวัติเดิมครบ)"
+                          >
+                            <EyeOff size={13} />
+                            <span>ซ่อนห้อง (เลิกใช้งาน)</span>
+                          </button>
+                        )}
+
+                        {/* Edit room */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (onEditRoom) {
+                              onEditRoom(room);
+                            } else {
+                              onOpenRoomModal();
+                            }
+                          }}
+                          className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold transition border border-blue-200"
+                          title="แก้ไขข้อมูลห้องประชุม"
+                        >
+                          <Edit size={13} />
+                          <span>แก้ไข</span>
+                        </button>
+
+                        {/* Delete room */}
+                        <button
+                          type="button"
+                          onClick={() => onDeleteRoom && onDeleteRoom(room.id)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition border border-transparent hover:border-red-200"
+                          title="ลบห้องนี้ออกจากระบบ"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

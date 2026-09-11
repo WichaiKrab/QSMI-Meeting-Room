@@ -3,6 +3,7 @@ export interface Room {
   name: string;
   color: string;
   isActive: boolean;
+  isRetired?: boolean; // ซ่อนห้องประชุมสำหรับห้องที่ได้เลิกใช้งานแล้ว ไม่แสดงในหน้าจองใหม่ แต่เก็บประวัติเดิม
   capacity?: number;
   location?: string;
   hasSpecialSeating?: boolean;
