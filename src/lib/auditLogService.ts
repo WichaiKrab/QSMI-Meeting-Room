@@ -17,6 +17,7 @@ const LOCAL_STORAGE_KEY = 'meeting_app_audit_logs';
 
 // In-memory cache for audit logs (avoids persisting sensitive admin logs in DevTools / LocalStorage)
 let inMemoryAuditLogs: AuditLog[] = [];
+const auditSubscribers = new Set<(logs: AuditLog[]) => void>();
 
 // Cleanup any legacy audit logs stored in localStorage
 if (typeof window !== 'undefined') {
@@ -326,6 +327,13 @@ export async function logActivity(params: {
   // 1. Save to in-memory cache immediately
   inMemoryAuditLogs = [auditEntry, ...inMemoryAuditLogs.filter((item) => item.id !== id)].slice(0, 500);
 
+  // Notify any active local UI subscribers immediately
+  auditSubscribers.forEach((cb) => {
+    try {
+      cb(inMemoryAuditLogs);
+    } catch (_) {}
+  });
+
   // 2. Persist to Firestore
   try {
     const docRef = doc(db, AUDIT_LOGS_COL, id);
@@ -341,6 +349,8 @@ export async function logActivity(params: {
  * Subscribe to Audit Logs in Real-Time
  */
 export function subscribeToAuditLogs(callback: (logs: AuditLog[]) => void) {
+  auditSubscribers.add(callback);
+
   // Read in-memory cache first if available for instant render
   if (inMemoryAuditLogs.length > 0) {
     callback(inMemoryAuditLogs);
@@ -363,12 +373,26 @@ export function subscribeToAuditLogs(callback: (logs: AuditLog[]) => void) {
           inMemoryAuditLogs = seeds;
           callback(seeds);
         } else {
-          const logs: AuditLog[] = [];
+          const cloudLogs: AuditLog[] = [];
           snapshot.forEach((docSnap) => {
-            logs.push(docSnap.data() as AuditLog);
+            cloudLogs.push(docSnap.data() as AuditLog);
           });
-          inMemoryAuditLogs = logs;
-          callback(logs);
+
+          // Merge any recent in-memory logs with cloud logs to prevent dropping unsaved/in-transit records
+          const mergedMap = new Map<string, AuditLog>();
+          cloudLogs.forEach((l) => mergedMap.set(l.id, l));
+          inMemoryAuditLogs.forEach((l) => {
+            if (!mergedMap.has(l.id)) {
+              mergedMap.set(l.id, l);
+            }
+          });
+
+          const mergedLogs = Array.from(mergedMap.values()).sort(
+            (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+          ).slice(0, 500);
+
+          inMemoryAuditLogs = mergedLogs;
+          callback(mergedLogs);
         }
       },
       (err) => {
@@ -383,11 +407,16 @@ export function subscribeToAuditLogs(callback: (logs: AuditLog[]) => void) {
       }
     );
 
-    return unsubscribe;
+    return () => {
+      auditSubscribers.delete(callback);
+      unsubscribe();
+    };
   } catch (err) {
     console.warn('Failed to start Firestore audit logs subscription:', err);
     callback(getInitialHistoricalLogs());
-    return () => {};
+    return () => {
+      auditSubscribers.delete(callback);
+    };
   }
 }
 
