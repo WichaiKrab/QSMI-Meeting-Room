@@ -409,8 +409,8 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
 
         {/* Action Footer */}
         <div className="p-4 border-t border-gray-100 bg-gray-50/90 space-y-2 shrink-0">
-          {/* Prompt to login as Admin/Manager to approve if viewing a pending booking */}
-          {isPending && !isBlocked && !canApproveOrReject && onOpenAdminLogin && (
+          {/* Prompt to login as Admin/Manager to approve if viewing a pending booking (Only when unauthenticated, NEVER for User accounts) */}
+          {isPending && !isBlocked && !canApproveOrReject && !currentUser && onOpenAdminLogin && (
             <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-900 flex items-center justify-between gap-3">
               <div>
                 <span className="font-bold block">คำขอนี้รอการอนุมัติ</span>

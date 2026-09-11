@@ -654,7 +654,7 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
                 ส่งคำขอลงทะเบียนสำเร็จ!
               </h3>
               <p className="text-xs text-gray-600 mt-1 max-w-sm mx-auto">
-                ระบบได้บันทึกข้อมูลของ <strong>คุณ{registeredApplicant.name}</strong> เรียบร้อยแล้ว
+                ระบบได้บันทึกข้อมูลของ <strong>{registeredApplicant.name}</strong> เรียบร้อยแล้ว
               </p>
             </div>
 
