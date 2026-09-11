@@ -2514,23 +2514,14 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   {bookingsDisplayLimit < filteredBookings.length ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setBookingsDisplayLimit((prev) => Math.min(prev + 10, filteredBookings.length))}
-                        className="flex items-center gap-1.5 px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-[#C8102E] rounded-xl text-xs font-bold transition shadow-2xs"
-                      >
-                        <ChevronDown size={14} />
-                        <span>ดูเพิ่มเติม (+10 รายการ)</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setBookingsDisplayLimit(filteredBookings.length)}
-                        className="px-3.5 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-xl text-xs font-semibold transition"
-                      >
-                        แสดงทั้งหมด ({filteredBookings.length})
-                      </button>
-                    </>
+                    <button
+                      type="button"
+                      onClick={() => setBookingsDisplayLimit((prev) => Math.min(prev + 10, filteredBookings.length))}
+                      className="flex items-center gap-1.5 px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-[#C8102E] rounded-xl text-xs font-bold transition shadow-2xs"
+                    >
+                      <ChevronDown size={14} />
+                      <span>ดูเพิ่มเติม (+10 รายการ)</span>
+                    </button>
                   ) : (
                     <button
                       type="button"
