@@ -1,59 +1,111 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Rooms collection
+
+    // ====================================================
+    // Validation Helper Functions for Collections
+    // ====================================================
+
+    function isValidRoom(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 200
+        && (!('capacity' in data) || data.capacity is number)
+        && (!('isActive' in data) || data.isActive is bool)
+        && (!('isRetired' in data) || data.isRetired is bool);
+    }
+
+    function isValidBooking(data) {
+      return data.roomId is string && data.roomId.size() > 0 && data.roomId.size() <= 128
+        && data.topic is string && data.topic.size() > 0 && data.topic.size() <= 500
+        && (!('department' in data) || (data.department is string && data.department.size() <= 200))
+        && (!('requesterName' in data) || (data.requesterName is string && data.requesterName.size() <= 200))
+        && (!('status' in data) || (data.status is string && data.status in ['pending', 'approved', 'rejected', 'cancelled']))
+        && (!('participants' in data) || data.participants is number);
+    }
+
+    function isValidUser(data) {
+      return data.username is string && data.username.size() > 0 && data.username.size() <= 128
+        && (!('name' in data) || (data.name is string && data.name.size() <= 200))
+        && (!('role' in data) || (data.role is string && data.role in ['admin', 'manager', 'employee']))
+        && (!('status' in data) || (data.status is string && data.status in ['pending', 'approved', 'rejected']));
+    }
+
+    function isValidDepartment(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 200;
+    }
+
+    function isValidNotification(data) {
+      return data.recipient is string && data.recipient.size() > 0 && data.recipient.size() <= 200
+        && (!('subject' in data) || (data.subject is string && data.subject.size() <= 500));
+    }
+
+    function isValidMail(data) {
+      return (!('to' in data) || (data.to is list || data.to is string));
+    }
+
+    // Default safety catch-all: reject any unknown collection
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 1. Rooms Collection
     match /rooms/{roomId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isValidRoom(request.resource.data);
+      allow delete: if true;
     }
 
-    // Bookings collection
+    // 2. Bookings Collection
     match /bookings/{bookingId} {
       allow read: if true;
-      allow create, update, delete: if true;
+      allow create, update: if isValidBooking(request.resource.data);
+      allow delete: if true;
     }
 
-    // Users collection
+    // 3. Users Collection
     match /users/{userId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isValidUser(request.resource.data);
+      allow delete: if true;
     }
 
-    // Departments collection
+    // 4. Departments Collection
     match /departments/{deptId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isValidDepartment(request.resource.data);
+      allow delete: if true;
     }
 
-    // Mail queue collection for Firebase Trigger Email Extension or backend mailer
+    // 5. Mail Queue Collection (Firebase Trigger Email Extension / mailer)
     match /mail/{mailId} {
       allow read: if true;
-      allow create: if true;
-      allow update, delete: if true;
+      allow create, update: if isValidMail(request.resource.data);
+      allow delete: if true;
     }
 
-    // Email Notifications collection
+    // 6. Email Notifications Collection
     match /emailNotifications/{notifId} {
       allow read: if true;
-      allow write: if true;
+      allow create, update: if isValidNotification(request.resource.data);
+      allow delete: if true;
     }
 
-    // System settings
+    // 7. System Settings Collection
     match /systemSettings/{settingId} {
       allow read: if true;
       allow write: if true;
     }
 
-    // User notification state (read/deleted IDs and cleared status per user across devices)
+    // 8. User Notification State (Read/Deleted/Cleared flags across devices)
     match /userNotificationStates/{userId} {
       allow read: if true;
       allow write: if true;
     }
 
-    // Audit and Activity Logs collection for Super Admin
+    // 9. Audit and Activity Logs Collection
     match /auditLogs/{logId} {
       allow read: if true;
-      allow write: if true;
+      allow create: if request.resource.data.action is string;
+      allow update, delete: if true;
     }
   }
 }
