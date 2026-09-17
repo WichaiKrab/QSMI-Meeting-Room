@@ -42,7 +42,8 @@ import {
   ChevronDown,
   ChevronUp,
   UploadCloud,
-  UserX
+  UserX,
+  Database
 } from 'lucide-react';
 import { Booking, Room, UserAccount, UserRole, UserStatus, Department, AuditLog } from '../types';
 import { formatThaiDate, formatThaiTime } from '../utils/thaiDate';
@@ -55,6 +56,7 @@ import { DepartmentManagementTab } from './DepartmentManagementTab';
 import { ImportExcelModal } from './ImportExcelModal';
 import { MyBookingsTab } from './MyBookingsTab';
 import { AuditLogTab } from './AuditLogTab';
+import { DatabaseBackupModal } from './DatabaseBackupModal';
 
 interface ManagementPortalProps {
   initialTab?: 'approvals' | 'users' | 'bookings' | 'my_history' | 'rooms' | 'reports' | 'directory' | 'departments' | 'my_profile' | 'audit_logs';
@@ -67,6 +69,7 @@ interface ManagementPortalProps {
   departments?: Department[];
   auditLogs?: AuditLog[];
   onRefreshAuditLogs?: () => void;
+  onRestoreDatabaseComplete?: () => void;
   onLogin: (user: UserAccount) => void;
   onLogout: () => void;
   onApprove: (id: string) => void;
@@ -110,6 +113,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
   departments = [],
   auditLogs = [],
   onRefreshAuditLogs,
+  onRestoreDatabaseComplete,
   onLogin,
   onLogout,
   onApprove,
@@ -139,6 +143,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
   onBatchImportBookings
 }) => {
   // Login Form States (for View A)
+  const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [roleTab, setRoleTab] = useState<'all' | UserRole>('all');
   const [selectedUser, setSelectedUser] = useState<UserAccount | null>(null);
@@ -1100,7 +1105,19 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
         </div>
 
         {/* Right Action Buttons */}
-        <div className="flex items-center gap-2 w-full md:w-auto justify-stretch sm:justify-end shrink-0">
+        <div className="flex items-center gap-2 w-full md:w-auto justify-stretch sm:justify-end shrink-0 flex-wrap">
+          {isSuperAdmin && (
+            <button
+              type="button"
+              onClick={() => setIsBackupModalOpen(true)}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs sm:text-sm font-bold shadow-xs transition whitespace-nowrap border border-slate-700"
+              title="สำรองข้อมูลทั้งหมดหรือกู้คืนฐานข้อมูล (8 Collections)"
+            >
+              <Database size={15} className="text-red-400" />
+              <span>สำรอง/กู้คืนฐานข้อมูล (Backup)</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onBackToBooking}
@@ -2889,6 +2906,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
           <AuditLogTab
             logs={auditLogs}
             onRefreshLogs={onRefreshAuditLogs}
+            onOpenBackupModal={() => setIsBackupModalOpen(true)}
           />
         )}
       </div>
@@ -3391,6 +3409,19 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
           onConfirmImport={(imported, options) => {
             if (onBatchImportBookings) {
               onBatchImportBookings(imported, options);
+            }
+          }}
+        />
+      )}
+
+      {/* Super Admin Database Backup & Restore Modal */}
+      {isSuperAdmin && isBackupModalOpen && (
+        <DatabaseBackupModal
+          isOpen={isBackupModalOpen}
+          onClose={() => setIsBackupModalOpen(false)}
+          onRestoreComplete={() => {
+            if (onRestoreDatabaseComplete) {
+              onRestoreDatabaseComplete();
             }
           }}
         />

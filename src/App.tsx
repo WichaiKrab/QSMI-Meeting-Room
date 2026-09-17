@@ -2122,6 +2122,11 @@ export default function App() {
               const fresh = await fetchLatestAuditLogs(50);
               if (fresh && fresh.length > 0) setAuditLogs(fresh);
             }}
+            onRestoreDatabaseComplete={async () => {
+              showToast('กู้คืนฐานข้อมูลสำเร็จ! กำลังรีเฟรชข้อมูลระบบ...', 'success');
+              const freshLogs = await fetchLatestAuditLogs(50);
+              if (freshLogs && freshLogs.length > 0) setAuditLogs(freshLogs);
+            }}
             onAddDepartment={handleAddDepartment}
             onUpdateDepartment={handleUpdateDepartment}
             onDeleteDepartment={handleDeleteDepartment}

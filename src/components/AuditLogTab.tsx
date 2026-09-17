@@ -27,7 +27,8 @@ import {
   SlidersHorizontal,
   ChevronLeft,
   ChevronRight,
-  ArrowUpDown
+  ArrowUpDown,
+  Database
 } from 'lucide-react';
 import { AuditLog, AuditActionType } from '../types';
 import { formatThaiDate, formatThaiTime } from '../utils/thaiDate';
@@ -35,9 +36,10 @@ import { formatThaiDate, formatThaiTime } from '../utils/thaiDate';
 interface AuditLogTabProps {
   logs: AuditLog[];
   onRefreshLogs?: () => void;
+  onOpenBackupModal?: () => void;
 }
 
-export const AuditLogTab: React.FC<AuditLogTabProps> = ({ logs, onRefreshLogs }) => {
+export const AuditLogTab: React.FC<AuditLogTabProps> = ({ logs, onRefreshLogs, onOpenBackupModal }) => {
   // Search and Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -363,6 +365,18 @@ export const AuditLogTab: React.FC<AuditLogTabProps> = ({ logs, onRefreshLogs })
           </div>
 
           <div className="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
+            {onOpenBackupModal && (
+              <button
+                type="button"
+                onClick={onOpenBackupModal}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-[#C8102E] hover:bg-[#a60d26] text-white shadow-xs transition cursor-pointer"
+                title="สำรองข้อมูลทั้งหมดหรือกู้คืนฐานข้อมูล (8 Collections)"
+              >
+                <Database size={15} />
+                <span>สำรอง/กู้คืนฐานข้อมูล (Backup & Restore)</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={handleRefresh}
