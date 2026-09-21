@@ -413,14 +413,9 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
             {/* Username & Role Selection */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-bold text-gray-700">
-                    ชื่อเข้าใช้งาน (Username) <span className="text-red-500">*</span>
-                  </label>
-                  <span className="text-[10px] text-gray-400 font-normal">
-                    (ไม่แยกพิมพ์เล็ก/ใหญ่)
-                  </span>
-                </div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  ชื่อเข้าใช้งาน (Username) <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   required
@@ -439,7 +434,7 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
                     );
                     return (
                       <p className={`text-[10px] sm:text-[11px] mt-1 font-medium leading-tight ${isDup ? 'text-red-500' : 'text-emerald-600'}`}>
-                        {isDup ? '⚠️ ชื่อผู้ใช้งานนี้มีอยู่ในระบบแล้ว (ไม่ว่าพิมพ์เล็กหรือใหญ่)' : '✓ สามารถใช้ชื่อผู้ใช้งานนี้ได้'}
+                        {isDup ? '⚠️ ชื่อผู้ใช้งานนี้มีอยู่ในระบบแล้ว' : '✓ สามารถใช้ชื่อผู้ใช้งานนี้ได้'}
                       </p>
                     );
                   })()
