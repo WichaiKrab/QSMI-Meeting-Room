@@ -413,15 +413,23 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
             {/* Username & Role Selection */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  ชื่อเข้าใช้งาน (Username) <span className="text-red-500">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-gray-700">
+                    ชื่อเข้าใช้งาน (Username) <span className="text-red-500">*</span>
+                  </label>
+                  <span className="text-[10px] text-gray-400 font-normal">
+                    (ไม่แยกพิมพ์เล็ก/ใหญ่)
+                  </span>
+                </div>
                 <input
                   type="text"
                   required
                   placeholder="เช่น somsak.t, anong.k"
                   value={regUsername}
-                  onChange={(e) => setRegUsername(e.target.value)}
+                  onChange={(e) => setRegUsername(e.target.value.toLowerCase())}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   className="w-full p-2.5 border border-gray-300 rounded-xl text-xs sm:text-sm font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-[#C8102E]"
                 />
                 {regUsername.trim().length > 0 && (
@@ -431,7 +439,7 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
                     );
                     return (
                       <p className={`text-[10px] sm:text-[11px] mt-1 font-medium leading-tight ${isDup ? 'text-red-500' : 'text-emerald-600'}`}>
-                        {isDup ? '⚠️ ชื่อผู้ใช้งานนี้มีอยู่ในระบบแล้ว' : '✓ สามารถใช้ชื่อผู้ใช้งานนี้ได้'}
+                        {isDup ? '⚠️ ชื่อผู้ใช้งานนี้มีอยู่ในระบบแล้ว (ไม่ว่าพิมพ์เล็กหรือใหญ่)' : '✓ สามารถใช้ชื่อผู้ใช้งานนี้ได้'}
                       </p>
                     );
                   })()
