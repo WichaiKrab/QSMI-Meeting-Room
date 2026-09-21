@@ -1572,6 +1572,14 @@ export default function App() {
   // --- User Account Management Handlers (Admin Approval & Registration) ---
   const handleRegisterUser = (newUser: UserAccount) => {
     const trimmedUsername = newUser.username.trim().toLowerCase();
+    const isEnglishOnly = /^[a-z0-9._-]+$/.test(trimmedUsername);
+    if (!isEnglishOnly) {
+      return {
+        success: false,
+        message: 'ชื่อเข้าใช้งาน (Username) ต้องเป็นภาษาอังกฤษ ตัวเลข หรือเครื่องหมาย . _ - เท่านั้น'
+      };
+    }
+
     const exists = users.some(
       (u) => u.username.trim().toLowerCase() === trimmedUsername
     );

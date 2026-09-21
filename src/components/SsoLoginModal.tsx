@@ -163,6 +163,13 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
       return;
     }
 
+    const trimmedUsername = regUsername.trim().toLowerCase();
+    const isEnglishOnly = /^[a-z0-9._-]+$/.test(trimmedUsername);
+    if (!isEnglishOnly) {
+      setRegError('ชื่อเข้าใช้งาน (Username) ต้องเป็นภาษาอังกฤษ ตัวเลข หรือเครื่องหมาย . _ - เท่านั้น');
+      return;
+    }
+
     if (regPassword.length < 8) {
       setRegError('รหัสผ่านต้องมีความยาวไม่น้อยกว่า 8 ตัวอักษร');
       return;
@@ -179,7 +186,6 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
     }
 
     // Check duplicate username
-    const trimmedUsername = regUsername.trim().toLowerCase();
     if (users.some((u) => u.username.toLowerCase() === trimmedUsername)) {
       setRegError(`ชื่อผู้ใช้งาน "${regUsername.trim()}" มีอยู่ในระบบแล้ว กรุณาเลือกชื่ออื่น`);
       return;
@@ -421,7 +427,11 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
                   required
                   placeholder="เช่น somsak.t, anong.k"
                   value={regUsername}
-                  onChange={(e) => setRegUsername(e.target.value.toLowerCase())}
+                  onChange={(e) => {
+                    // Only allow English letters, numbers, and ., _, -
+                    const val = e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '');
+                    setRegUsername(val);
+                  }}
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
@@ -434,7 +444,7 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
                     );
                     return (
                       <p className={`text-[10px] sm:text-[11px] mt-1 font-medium leading-tight ${isDup ? 'text-red-500' : 'text-emerald-600'}`}>
-                        {isDup ? '⚠️ ชื่อผู้ใช้งานนี้มีอยู่ในระบบแล้ว' : '✓ สามารถใช้ชื่อผู้ใช้งานนี้ได้'}
+                        {isDup ? '⚠️ ชื่อผู้ใช้งานนี้มีอยู่ในระบบแล้ว' : '✓ สามารถใช้ชื่อผู้ใช้งานนี้ได้ (ภาษาอังกฤษ)'}
                       </p>
                     );
                   })()

@@ -420,6 +420,12 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
     }
 
     const trimmedUsername = regUsername.trim().toLowerCase();
+    const isEnglishOnly = /^[a-z0-9._-]+$/.test(trimmedUsername);
+    if (!isEnglishOnly) {
+      setLoginError('ชื่อเข้าใช้งาน (Username) ต้องเป็นภาษาอังกฤษ ตัวเลข หรือเครื่องหมาย . _ - เท่านั้น');
+      return;
+    }
+
     if (users.some((u) => u.username.trim().toLowerCase() === trimmedUsername)) {
       setLoginError(`ชื่อผู้ใช้งาน "${regUsername.trim()}" มีอยู่ในระบบแล้ว ไม่สามารถใช้ชื่อผู้ใช้งานซ้ำได้ กรุณาเลือกชื่ออื่น`);
       return;
@@ -469,6 +475,12 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
     if (!newAdminUserUsername.trim() || !newAdminUserName.trim()) return;
 
     const trimmedUsername = newAdminUserUsername.trim().toLowerCase();
+    const isEnglishOnly = /^[a-z0-9._-]+$/.test(trimmedUsername);
+    if (!isEnglishOnly) {
+      alert('ชื่อเข้าใช้งาน (Username) ต้องเป็นภาษาอังกฤษ ตัวเลข หรือเครื่องหมาย . _ - เท่านั้น');
+      return;
+    }
+
     if (users.some((u) => u.username.toLowerCase() === trimmedUsername)) {
       alert(`ชื่อผู้ใช้งาน "${newAdminUserUsername.trim()}" มีอยู่ในระบบแล้ว กรุณาเลือกชื่ออื่น`);
       return;
@@ -933,7 +945,10 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                       required
                       placeholder="เช่น kitti.s"
                       value={regUsername}
-                      onChange={(e) => setRegUsername(e.target.value.toLowerCase())}
+                      onChange={(e) => {
+                        const val = e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '');
+                        setRegUsername(val);
+                      }}
                       autoCapitalize="none"
                       autoCorrect="off"
                       spellCheck={false}
@@ -946,7 +961,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                         );
                         return (
                           <p className={`text-[10px] sm:text-[11px] mt-1 font-medium leading-tight ${isDup ? 'text-red-500' : 'text-emerald-600'}`}>
-                            {isDup ? '⚠️ ชื่อผู้ใช้งานนี้มีอยู่ในระบบแล้ว' : '✓ สามารถใช้ชื่อผู้ใช้งานนี้ได้'}
+                            {isDup ? '⚠️ ชื่อผู้ใช้งานนี้มีอยู่ในระบบแล้ว' : '✓ สามารถใช้ชื่อผู้ใช้งานนี้ได้ (ภาษาอังกฤษ)'}
                           </p>
                         );
                       })()
@@ -3027,7 +3042,10 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                     required
                     placeholder="เช่น somkiat.s"
                     value={newAdminUserUsername}
-                    onChange={(e) => setNewAdminUserUsername(e.target.value.toLowerCase())}
+                    onChange={(e) => {
+                      const val = e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '');
+                      setNewAdminUserUsername(val);
+                    }}
                     autoCapitalize="none"
                     autoCorrect="off"
                     spellCheck={false}
@@ -3040,7 +3058,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                       );
                       return (
                         <p className={`text-[10px] mt-1 font-medium ${isDup ? 'text-red-500' : 'text-emerald-600'}`}>
-                          {isDup ? '⚠️ ชื่อเข้าระบบนี้ซ้ำ' : '✓ ใช้ได้'}
+                          {isDup ? '⚠️ ชื่อเข้าระบบนี้ซ้ำ' : '✓ ใช้ได้ (ภาษาอังกฤษ)'}
                         </p>
                       );
                     })()
