@@ -198,6 +198,17 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
       return;
     }
 
+    if (!regPhone.trim()) {
+      setRegError('กรุณาระบุเบอร์โทรศัพท์ติดต่อ');
+      return;
+    }
+
+    const cleanPhone = regPhone.replace(/\D/g, '');
+    if (cleanPhone.length !== 10 || !cleanPhone.startsWith('0')) {
+      setRegError('เบอร์โทรศัพท์ติดต่อต้องเป็นตัวเลข 10 หลัก (เช่น 0812345678)');
+      return;
+    }
+
     const newUser: UserAccount = {
       username: trimmedUsername,
       password: regPassword,
@@ -206,7 +217,7 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
       title: regTitle.trim() || (regRole === 'manager' ? 'ผู้ดูแลระบบ' : 'เจ้าหน้าที่'),
       role: regRole,
       email: regEmail.trim() || `${trimmedUsername}@qsmi.or.th`,
-      phone: formatThaiPhone(regPhone.trim() || '022520161', '02-252-0161'),
+      phone: formatThaiPhone(cleanPhone, '02-252-0161'),
       status: 'pending',
       registeredAt: new Date().toISOString(),
       avatarColor: regRole === 'manager' ? 'bg-blue-600' : 'bg-teal-600'
@@ -617,16 +628,26 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  เบอร์โทรศัพท์ติดต่อ <span className="text-red-500">*</span>
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-gray-700">
+                    เบอร์โทรศัพท์ติดต่อ <span className="text-red-500">*</span>
+                  </label>
+                  <span className="text-[11px] text-gray-400 font-medium">
+                    {regPhone.length}/10
+                  </span>
+                </div>
                 <div className="relative">
                   <input
                     type="tel"
                     required
+                    maxLength={10}
+                    inputMode="numeric"
                     placeholder="เช่น 0812345678"
                     value={regPhone}
-                    onChange={(e) => setRegPhone(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setRegPhone(val);
+                    }}
                     className="w-full p-2.5 pr-8 border border-gray-300 rounded-xl text-xs sm:text-sm font-semibold text-gray-800 outline-none focus:ring-2 focus:ring-[#C8102E]"
                   />
                   <Phone size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400" />

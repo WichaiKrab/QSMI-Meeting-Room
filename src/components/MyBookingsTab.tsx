@@ -606,16 +606,31 @@ export const MyBookingsTab: React.FC<MyBookingsTabProps> = ({
                     </div>
 
                     {/* Cancel Booking Action */}
-                    {(isPending || isApproved) && (
-                      isPast && !isUserAdmin ? (
-                        <div
-                          className="px-3 py-1.5 rounded-xl bg-gray-100 text-gray-500 text-xs font-medium border border-gray-200 flex items-center gap-1.5 ml-auto cursor-not-allowed select-none"
-                          title="บัญชี User ไม่สามารถยกเลิกการจองในวันที่และเวลาที่ผ่านมาแล้วได้"
-                        >
-                          <Clock size={13} className="text-gray-400" />
-                          <span>พ้นกำหนดเวลา (ไม่สามารถยกเลิกได้)</span>
-                        </div>
-                      ) : (
+                    {(isPending || isApproved) && (() => {
+                      const isOwner = Boolean(
+                        currentUser &&
+                          ((b.username && currentUser.username && currentUser.username.trim().toLowerCase() === b.username.trim().toLowerCase()) ||
+                            (!b.username && currentUser.name && currentUser.name.trim().toLowerCase() === b.requesterName?.trim().toLowerCase()) ||
+                            (!b.username && currentUser.email && b.email && currentUser.email.trim().toLowerCase() === b.email.trim().toLowerCase()))
+                      );
+
+                      if (!isUserAdmin && !isOwner) {
+                        return null;
+                      }
+
+                      if (isPast && !isUserAdmin) {
+                        return (
+                          <div
+                            className="px-3 py-1.5 rounded-xl bg-gray-100 text-gray-500 text-xs font-medium border border-gray-200 flex items-center gap-1.5 ml-auto cursor-not-allowed select-none"
+                            title="บัญชี User ไม่สามารถยกเลิกการจองในวันที่และเวลาที่ผ่านมาแล้วได้"
+                          >
+                            <Clock size={13} className="text-gray-400" />
+                            <span>พ้นกำหนดเวลา (ไม่สามารถยกเลิกได้)</span>
+                          </div>
+                        );
+                      }
+
+                      return (
                         <button
                           type="button"
                           onClick={() => onRequestCancel(b)}
@@ -624,8 +639,8 @@ export const MyBookingsTab: React.FC<MyBookingsTabProps> = ({
                           <Ban size={14} />
                           <span>ยกเลิกการจอง</span>
                         </button>
-                      )
-                    )}
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

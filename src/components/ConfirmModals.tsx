@@ -223,7 +223,14 @@ export const CancelBookingModal: React.FC<CancelBookingModalProps> = ({
 
   const isPast = isBookingInPast(booking);
   const isUserAdmin = Boolean(isAdminMode || currentUser?.role === 'admin' || currentUser?.role === 'manager');
+  const isBookingOwner = Boolean(
+    currentUser &&
+      ((booking.username && currentUser.username && currentUser.username.trim().toLowerCase() === booking.username.trim().toLowerCase()) ||
+        (!booking.username && currentUser.name && currentUser.name.trim().toLowerCase() === booking.requesterName?.trim().toLowerCase()) ||
+        (!booking.username && currentUser.email && booking.email && currentUser.email.trim().toLowerCase() === booking.email.trim().toLowerCase()))
+  );
   const isPastUserBlock = !isUserAdmin && isPast;
+  const isNotOwnerBlock = !isUserAdmin && !isBookingOwner;
 
   const room = rooms.find((r) => r.id === booking.roomId);
   const roomName = room ? room.name : 'ห้องประชุม';
@@ -232,6 +239,10 @@ export const CancelBookingModal: React.FC<CancelBookingModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isNotOwnerBlock) {
+      setError('บัญชี User ไม่สามารถยกเลิกการจองของ User คนอื่นได้');
+      return;
+    }
     if (isPastUserBlock) {
       setError('บัญชี User ไม่สามารถยกเลิกการจองในวันที่และเวลาที่ผ่านมาแล้วได้');
       return;

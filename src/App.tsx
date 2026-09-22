@@ -1337,6 +1337,17 @@ export default function App() {
     if (!b) throw new Error('ไม่พบข้อมูลการจอง');
 
     const isUserAdmin = isAdminMode || currentUser?.role === 'admin' || currentUser?.role === 'manager';
+    const isOwner = Boolean(
+      currentUser &&
+        ((b.username && currentUser.username && currentUser.username.trim().toLowerCase() === b.username.trim().toLowerCase()) ||
+          (!b.username && currentUser.name && currentUser.name.trim().toLowerCase() === b.requesterName?.trim().toLowerCase()) ||
+          (!b.username && currentUser.email && b.email && currentUser.email.trim().toLowerCase() === b.email.trim().toLowerCase()))
+    );
+
+    if (!isUserAdmin && !isOwner) {
+      throw new Error('บัญชี User ไม่สามารถยกเลิกการจองของ User คนอื่นได้');
+    }
+
     if (!isUserAdmin && isBookingInPast(b)) {
       throw new Error('บัญชี User ไม่สามารถยกเลิกการจองในวันที่และเวลาที่ผ่านมาแล้วได้');
     }
@@ -1598,6 +1609,16 @@ export default function App() {
         return {
           success: false,
           message: `อีเมล "${newUser.email}" มีอยู่ในระบบแล้ว ไม่สามารถใช้อีเมลซ้ำได้`
+        };
+      }
+    }
+
+    if (newUser.phone) {
+      const cleanPhone = newUser.phone.replace(/\D/g, '');
+      if (cleanPhone.length > 0 && (cleanPhone.length !== 10 || !cleanPhone.startsWith('0'))) {
+        return {
+          success: false,
+          message: 'เบอร์โทรศัพท์ติดต่อต้องเป็นตัวเลข 10 หลัก (เช่น 0812345678)'
         };
       }
     }
@@ -2189,6 +2210,16 @@ export default function App() {
             }}
             onRequestCancel={(b) => {
               const isUserAdmin = isAdminMode || currentUser?.role === 'admin' || currentUser?.role === 'manager';
+              const isOwner = Boolean(
+                currentUser &&
+                  ((b.username && currentUser.username && currentUser.username.trim().toLowerCase() === b.username.trim().toLowerCase()) ||
+                    (!b.username && currentUser.name && currentUser.name.trim().toLowerCase() === b.requesterName?.trim().toLowerCase()) ||
+                    (!b.username && currentUser.email && b.email && currentUser.email.trim().toLowerCase() === b.email.trim().toLowerCase()))
+              );
+              if (!isUserAdmin && !isOwner) {
+                showToast('บัญชี User ไม่สามารถยกเลิกการจองของ User คนอื่นได้', 'error');
+                return;
+              }
               if (!isUserAdmin && isBookingInPast(b)) {
                 showToast('บัญชี User ไม่สามารถยกเลิกการจองในวันที่และเวลาที่ผ่านมาแล้วได้', 'error');
                 return;
@@ -2358,6 +2389,16 @@ export default function App() {
         }}
         onCancelClick={(b) => {
           const isUserAdmin = isAdminMode || currentUser?.role === 'admin' || currentUser?.role === 'manager';
+          const isOwner = Boolean(
+            currentUser &&
+              ((b.username && currentUser.username && currentUser.username.trim().toLowerCase() === b.username.trim().toLowerCase()) ||
+                (!b.username && currentUser.name && currentUser.name.trim().toLowerCase() === b.requesterName?.trim().toLowerCase()) ||
+                (!b.username && currentUser.email && b.email && currentUser.email.trim().toLowerCase() === b.email.trim().toLowerCase()))
+          );
+          if (!isUserAdmin && !isOwner) {
+            showToast('บัญชี User ไม่สามารถยกเลิกการจองของ User คนอื่นได้', 'error');
+            return;
+          }
           if (!isUserAdmin && isBookingInPast(b)) {
             showToast('บัญชี User ไม่สามารถยกเลิกการจองในวันที่และเวลาที่ผ่านมาแล้วได้', 'error');
             return;

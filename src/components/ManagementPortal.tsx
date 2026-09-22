@@ -442,6 +442,12 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
       return;
     }
 
+    const cleanPhone = regPhone.replace(/\D/g, '');
+    if (regPhone.trim() && (cleanPhone.length !== 10 || !cleanPhone.startsWith('0'))) {
+      setLoginError('เบอร์โทรศัพท์ติดต่อต้องเป็นตัวเลข 10 หลัก (เช่น 0812345678)');
+      return;
+    }
+
     const newUser: UserAccount = {
       username: trimmedUsername,
       password: regPassword || '1234',
@@ -450,7 +456,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
       title: regTitle.trim() || 'เจ้าหน้าที่',
       role: regRole,
       email: regEmail.trim() || `${trimmedUsername}@qsmi.or.th`,
-      phone: formatThaiPhone(regPhone.trim() || '022520161', '02-252-0161'),
+      phone: formatThaiPhone(cleanPhone || '022520161', '02-252-0161'),
       status: 'pending',
       registeredAt: new Date().toISOString(),
       avatarColor: regRole === 'manager' ? 'bg-blue-600' : 'bg-teal-600'
@@ -492,6 +498,12 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
       return;
     }
 
+    const cleanPhone = newAdminUserPhone.replace(/\D/g, '');
+    if (newAdminUserPhone.trim() && (cleanPhone.length !== 10 || !cleanPhone.startsWith('0'))) {
+      alert('เบอร์โทรศัพท์ติดต่อต้องเป็นตัวเลข 10 หลัก (เช่น 0812345678)');
+      return;
+    }
+
     const newUser: UserAccount = {
       username: trimmedUsername,
       password: newAdminUserPassword || '1234',
@@ -500,7 +512,7 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
       title: newAdminUserTitle.trim() || 'เจ้าหน้าที่',
       role: newAdminUserRole,
       email: newAdminUserEmail.trim() || `${trimmedUsername}@qsmi.or.th`,
-      phone: formatThaiPhone(newAdminUserPhone.trim() || '022520161', '02-252-0161'),
+      phone: formatThaiPhone(cleanPhone || '022520161', '02-252-0161'),
       status: 'approved',
       approvedAt: new Date().toISOString(),
       approvedBy: currentUser?.name || 'Admin',
@@ -1043,14 +1055,24 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">
-                        โทรศัพท์
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-bold text-gray-700">
+                          โทรศัพท์
+                        </label>
+                        <span className="text-[10px] text-gray-400 font-medium">
+                          {regPhone.length}/10
+                        </span>
+                      </div>
                       <input
                         type="tel"
-                        placeholder="0812345678"
+                        maxLength={10}
+                        inputMode="numeric"
+                        placeholder="เช่น 0812345678"
                         value={regPhone}
-                        onChange={(e) => setRegPhone(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                          setRegPhone(val);
+                        }}
                         className="w-full p-2 border border-gray-300 rounded-xl text-xs font-medium text-gray-900 outline-none focus:ring-2 focus:ring-[#C8102E]"
                       />
                     </div>
@@ -3140,14 +3162,24 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    เบอร์โทรศัพท์
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-gray-700">
+                      เบอร์โทรศัพท์
+                    </label>
+                    <span className="text-[10px] text-gray-400 font-medium">
+                      {newAdminUserPhone.length}/10
+                    </span>
+                  </div>
                   <input
                     type="tel"
-                    placeholder="0812345678"
+                    maxLength={10}
+                    inputMode="numeric"
+                    placeholder="เช่น 0812345678"
                     value={newAdminUserPhone}
-                    onChange={(e) => setNewAdminUserPhone(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setNewAdminUserPhone(val);
+                    }}
                     className="w-full p-2 border border-gray-300 rounded-xl text-xs font-medium text-gray-900 outline-none focus:ring-2 focus:ring-[#C8102E]"
                   />
                 </div>

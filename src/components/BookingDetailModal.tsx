@@ -124,14 +124,13 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
     isAdminMode ||
     (currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager'));
 
-  // Determine if current user can cancel:
-  // - Super Admin / Admin can cancel any booking.
-  // - User account (employee / creator) can ONLY cancel if the booking date & time has NOT passed.
+  // Determine if current user is the actual creator/owner of the booking:
+  // Strictly checks username match first; if booking has no username, checks requester name or email
   const isBookingOwner = Boolean(
     currentUser &&
-      ((booking.username && currentUser.username?.toLowerCase() === booking.username.toLowerCase()) ||
-        currentUser.department === booking.department ||
-        currentUser.name === booking.requesterName)
+      ((booking.username && currentUser.username && currentUser.username.trim().toLowerCase() === booking.username.trim().toLowerCase()) ||
+        (!booking.username && currentUser.name && currentUser.name.trim().toLowerCase() === booking.requesterName?.trim().toLowerCase()) ||
+        (!booking.username && currentUser.email && booking.email && currentUser.email.trim().toLowerCase() === booking.email.trim().toLowerCase()))
   );
 
   const canCancel =
