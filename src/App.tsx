@@ -1419,14 +1419,26 @@ export default function App() {
   const handleDeleteBooking = (id: string) => {
     const booking = bookings.find((b) => b.id === id);
     if (!booking) return;
+
+    // ตรวจสอบสิทธิ์: การลบรายการจองถาวร ทำได้เฉพาะบัญชี Super Admin (role === 'admin') เท่านั้น
+    if (!booking.isBlocked && currentUser?.role !== 'admin') {
+      showToast('การลบรายการจองถาวรทำได้เฉพาะบัญชีผู้ดูแลระบบสูงสุด (Super Admin) เท่านั้น', 'error');
+      return;
+    }
+
     const room = rooms.find((r) => r.id === booking.roomId);
+    const isBlock = Boolean(booking.isBlocked);
 
     setDeleteModalState({
       isOpen: true,
-      title: 'ยืนยันการลบรายการจองห้องประชุม',
-      description: 'คุณต้องการลบข้อมูลรายการจองนี้ออกจากระบบถาวรใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้',
+      title: isBlock
+        ? 'ยืนยันการยกเลิกการปิดปรับปรุงห้องประชุม'
+        : 'ยืนยันการลบรายการจองห้องประชุมถาวร (เฉพาะ Super Admin)',
+      description: isBlock
+        ? 'คุณต้องการยกเลิกการปิดปรับปรุงและเปิดให้จองห้องนี้ตามปกติใช่หรือไม่?'
+        : 'คุณต้องการลบข้อมูลรายการจองนี้ออกจากระบบถาวรใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้',
       itemDetails: [
-        { label: 'หัวข้อการประชุม', value: booking.topic },
+        { label: isBlock ? 'เหตุผลการปิดปรับปรุง' : 'หัวข้อการประชุม', value: booking.topic },
         { label: 'ห้องประชุม', value: room ? room.name : 'ห้องประชุม' },
         { label: 'ผู้ขอจอง / ฝ่าย', value: `${booking.requesterName} (${booking.department || '-'})` },
         {
@@ -1441,7 +1453,12 @@ export default function App() {
           setViewingBooking(null);
           setIsDetailModalOpen(false);
         }
-        showToast(`ลบรายการจอง "${booking.topic}" เรียบร้อยแล้ว`, 'info');
+        showToast(
+          isBlock
+            ? `ยกเลิกการปิดปรับปรุงห้อง "${room?.name || ''}" เรียบร้อยแล้ว`
+            : `ลบรายการจอง "${booking.topic}" ถาวรเรียบร้อยแล้ว`,
+          'info'
+        );
       }
     });
   };

@@ -495,8 +495,8 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
             </div>
           )}
 
-          {/* Admin Delete Booking Permanently */}
-          {(isAdminMode || currentUser?.role === 'admin') && onDeleteClick && (
+          {/* Super Admin Only: Delete Booking Permanently */}
+          {currentUser?.role === 'admin' && onDeleteClick && (
             <button
               type="button"
               onClick={() => {
@@ -505,7 +505,7 @@ export const BookingDetailModal: React.FC<BookingDetailModalProps> = ({
               }}
               className="w-full py-2 bg-gray-100 hover:bg-red-50 text-gray-600 hover:text-red-600 font-bold rounded-xl transition border border-gray-200 hover:border-red-200 flex items-center justify-center gap-1.5 text-xs"
             >
-              <Trash2 size={14} /> ลบรายการจองนี้ถาวร (Admin Delete)
+              <Trash2 size={14} /> ลบรายการจองนี้ถาวร (เฉพาะ Super Admin)
             </button>
           )}
 

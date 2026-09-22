@@ -2382,14 +2382,16 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                                 <Edit size={14} />
                               </button>
                             )}
-                            <button
-                              type="button"
-                              onClick={() => onDeleteBooking(b.id)}
-                              className="p-2 bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-600 border border-gray-200 rounded-xl text-xs font-bold transition"
-                              title="ลบรายการจองถาวร"
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                            {isSuperAdmin && (
+                              <button
+                                type="button"
+                                onClick={() => onDeleteBooking(b.id)}
+                                className="p-2 bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-600 border border-gray-200 rounded-xl text-xs font-bold transition"
+                                title="ลบรายการจองถาวร (เฉพาะ Super Admin)"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
                           </>
                         )}
                       </div>
@@ -2544,14 +2546,16 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                                       <Edit size={14} />
                                     </button>
                                   )}
-                                  <button
-                                    type="button"
-                                    onClick={() => onDeleteBooking(b.id)}
-                                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                                    title="ลบรายการจองถาวร"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
+                                  {isSuperAdmin && (
+                                    <button
+                                      type="button"
+                                      onClick={() => onDeleteBooking(b.id)}
+                                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                                      title="ลบรายการจองถาวร (เฉพาะ Super Admin)"
+                                    >
+                                      <Trash2 size={14} />
+                                    </button>
+                                  )}
                                 </>
                               )}
                             </div>
