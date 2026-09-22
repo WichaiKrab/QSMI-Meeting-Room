@@ -154,7 +154,8 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
 
   const availableDeptNames = useMemo(() => {
     if (departments && departments.length > 0) {
-      return departments.map((d) => d.name);
+      const names = departments.map((d) => d.name?.trim()).filter(Boolean);
+      return Array.from(new Set(names));
     }
     return [
       'ฝ่ายบริหารงานทั่วไป',
@@ -2120,9 +2121,9 @@ export const ManagementPortal: React.FC<ManagementPortalProps> = ({
                   className="p-2 sm:p-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none flex-1 sm:flex-initial sm:max-w-[150px] truncate"
                 >
                   <option value="all">ทุกฝ่าย / หน่วยงาน</option>
-                  {departments.map((d) => (
-                    <option key={d.id} value={d.name}>
-                      {d.name}
+                  {availableDeptNames.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
                     </option>
                   ))}
                 </select>

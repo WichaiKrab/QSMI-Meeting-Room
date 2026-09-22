@@ -41,13 +41,28 @@ export const DepartmentManagementTab: React.FC<DepartmentManagementTabProps> = (
   const [departmentName, setDepartmentName] = useState('');
   const [formError, setFormError] = useState('');
 
+  // Ensure unique list of departments (guarantees no duplicate cards or counts)
+  const uniqueDepartments = useMemo(() => {
+    const seen = new Set<string>();
+    const result: Department[] = [];
+    for (const d of departments) {
+      if (!d || !d.name) continue;
+      const key = d.name.trim().toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push({ ...d, name: d.name.trim() });
+      }
+    }
+    return result;
+  }, [departments]);
+
   // Search filtering by Department Name
   const filteredDepartments = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    if (!term) return departments;
+    if (!term) return uniqueDepartments;
 
-    return departments.filter((d) => d.name.toLowerCase().includes(term));
-  }, [departments, searchTerm]);
+    return uniqueDepartments.filter((d) => d.name.toLowerCase().includes(term));
+  }, [uniqueDepartments, searchTerm]);
 
   // Open Add Modal
   const handleOpenAdd = () => {
@@ -75,7 +90,7 @@ export const DepartmentManagementTab: React.FC<DepartmentManagementTabProps> = (
     }
 
     // Check duplicate name
-    const isDuplicate = departments.some(
+    const isDuplicate = uniqueDepartments.some(
       (d) =>
         d.name.trim().toLowerCase() === trimmedName.toLowerCase() &&
         d.id !== editingDept?.id
@@ -141,7 +156,7 @@ export const DepartmentManagementTab: React.FC<DepartmentManagementTabProps> = (
             <span>จำนวนฝ่ายทั้งหมด</span>
           </div>
           <div className="text-xl sm:text-2xl font-black text-gray-900 mt-1">
-            {departments.length} <span className="text-xs font-normal text-gray-500">ฝ่าย</span>
+            {uniqueDepartments.length} <span className="text-xs font-normal text-gray-500">ฝ่าย</span>
           </div>
         </div>
 

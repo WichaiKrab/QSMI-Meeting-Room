@@ -170,12 +170,27 @@ export default function App() {
     return CORPORATE_USERS;
   });
 
+  // Helper to deduplicate departments by trimmed case-insensitive name
+  const deduplicateDepartments = (list: Department[]): Department[] => {
+    const seen = new Set<string>();
+    const result: Department[] = [];
+    for (const d of list) {
+      if (!d || !d.name) continue;
+      const key = d.name.trim().toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push({ ...d, name: d.name.trim() });
+      }
+    }
+    return result;
+  };
+
   const [departments, setDepartments] = useState<Department[]>(() => {
     try {
       const saved = localStorage.getItem('meeting_app_departments');
-      return saved ? JSON.parse(saved) : INITIAL_DEPARTMENTS;
+      return deduplicateDepartments(saved ? JSON.parse(saved) : INITIAL_DEPARTMENTS);
     } catch {
-      return INITIAL_DEPARTMENTS;
+      return deduplicateDepartments(INITIAL_DEPARTMENTS);
     }
   });
 
@@ -597,7 +612,7 @@ export default function App() {
 
     const unsubDepts = subscribeToDepartments((cloudDepts) => {
       if (cloudDepts && cloudDepts.length > 0) {
-        setDepartments(cloudDepts);
+        setDepartments(deduplicateDepartments(cloudDepts));
       }
     });
 
@@ -1902,22 +1917,48 @@ export default function App() {
 
   // --- Department Data Management Handlers ---
   const handleAddDepartment = (newDept: Omit<Department, 'id'>) => {
+    const trimmedName = newDept.name.trim();
+    if (!trimmedName) return;
+
+    // Guard against duplicate department names
+    const isDuplicate = departments.some(
+      (d) => d.name.trim().toLowerCase() === trimmedName.toLowerCase()
+    );
+    if (isDuplicate) {
+      showToast(`มีฝ่ายชื่อ "${trimmedName}" อยู่ในระบบแล้ว`, 'error');
+      return;
+    }
+
     const id = `dept-${Date.now()}`;
     const fullDept: Department = {
       ...newDept,
+      name: trimmedName,
       id
     };
-    setDepartments((prev) => [...prev, fullDept]);
+    setDepartments((prev) => deduplicateDepartments([...prev, fullDept]));
     saveDepartmentToFirestore(fullDept).catch(console.warn);
     showToast(`เพิ่มฝ่าย "${fullDept.name}" เรียบร้อยแล้ว`, 'success');
   };
 
   const handleUpdateDepartment = (updatedDept: Department) => {
-    setDepartments((prev) =>
-      prev.map((d) => (d.id === updatedDept.id ? updatedDept : d))
+    const trimmedName = updatedDept.name.trim();
+    if (!trimmedName) return;
+
+    // Guard against renaming to another existing department
+    const isDuplicate = departments.some(
+      (d) => d.id !== updatedDept.id && d.name.trim().toLowerCase() === trimmedName.toLowerCase()
     );
-    updateDepartmentInFirestore(updatedDept.id, updatedDept).catch(console.warn);
-    showToast(`อัปเดตข้อมูลฝ่าย "${updatedDept.name}" เรียบร้อยแล้ว`, 'success');
+    if (isDuplicate) {
+      showToast(`มีฝ่ายชื่อ "${trimmedName}" อยู่ในระบบแล้ว`, 'error');
+      return;
+    }
+
+    const cleanDept = { ...updatedDept, name: trimmedName };
+    setDepartments((prev) =>
+      deduplicateDepartments(prev.map((d) => (d.id === cleanDept.id ? cleanDept : d)))
+    );
+    updateDepartmentInFirestore(cleanDept.id, cleanDept).catch(console.warn);
+    showToast(`อัปเดตข้อมูลฝ่าย "${cleanDept.name}" เรียบร้อยแล้ว`, 'success');
   };
 
   const handleDeleteDepartment = (deptId: string) => {

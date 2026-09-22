@@ -46,9 +46,10 @@ export const SsoLoginModal: React.FC<SsoLoginModalProps> = ({
 
   const availableDepts = useMemo(() => {
     if (departments && departments.length > 0) {
-      return departments.map((d) => d.name);
+      const names = departments.map((d) => d.name?.trim()).filter(Boolean);
+      return Array.from(new Set(names));
     }
-    return INITIAL_DEPARTMENTS.map((d) => d.name);
+    return Array.from(new Set(INITIAL_DEPARTMENTS.map((d) => d.name.trim())));
   }, [departments]);
 
   // Mode: 'login' | 'register' | 'register_success'

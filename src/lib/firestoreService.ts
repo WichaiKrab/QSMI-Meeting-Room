@@ -161,9 +161,60 @@ export function subscribeToUsers(callback: (users: UserAccount[]) => void) {
 export function subscribeToDepartments(callback: (depts: Department[]) => void) {
   const q = collection(db, DEPTS_COL);
   return onSnapshot(q, (snapshot) => {
-    const items: Department[] = [];
-    snapshot.forEach((docSnap) => items.push(docSnap.data() as Department));
-    callback(items);
+    const deptMap = new Map<string, Department>();
+    const duplicateDocIdsToDelete: string[] = [];
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data() as Partial<Department>;
+      if (!data) return;
+      const rawName = data.name || '';
+      const name = rawName.trim();
+      if (!name) return;
+
+      const normKey = name.toLowerCase();
+      const id = data.id || docSnap.id;
+      const deptObj: Department = {
+        id,
+        name,
+        code: data.code || '',
+        headName: data.headName || '',
+        headUsername: data.headUsername || '',
+        phone: data.phone || '',
+        email: data.email || '',
+        building: data.building || '',
+        description: data.description || '',
+        color: data.color || 'bg-red-500',
+        createdAt: data.createdAt || ''
+      };
+
+      if (!deptMap.has(normKey)) {
+        deptMap.set(normKey, deptObj);
+      } else {
+        const existing = deptMap.get(normKey)!;
+        // Prioritize predefined dept id (like dept-1 to dept-10) or id matching docSnap.id
+        if (existing.id.startsWith('dept-') && !docSnap.id.startsWith('dept-')) {
+          duplicateDocIdsToDelete.push(docSnap.id);
+        } else if (!existing.id.startsWith('dept-') && docSnap.id.startsWith('dept-')) {
+          duplicateDocIdsToDelete.push(existing.id);
+          deptMap.set(normKey, deptObj);
+        } else {
+          duplicateDocIdsToDelete.push(docSnap.id);
+        }
+      }
+    });
+
+    // Automatically remove duplicate documents from Firestore so the database remains clean
+    if (duplicateDocIdsToDelete.length > 0) {
+      console.log('Cleaning up duplicate department documents in Firestore:', duplicateDocIdsToDelete);
+      for (const dupId of duplicateDocIdsToDelete) {
+        deleteDoc(doc(db, DEPTS_COL, dupId)).catch((err) => {
+          console.warn(`Note on duplicate department cleanup ${dupId}:`, err);
+        });
+      }
+    }
+
+    const uniqueList = Array.from(deptMap.values());
+    callback(uniqueList);
   }, (err) => {
     console.warn('Departments subscription error:', err);
   });
